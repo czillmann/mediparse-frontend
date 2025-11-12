@@ -7,6 +7,7 @@ import Navigation from './components/Navigation'
 import HealthInsuranceManagement from './components/HealthInsuranceManagement'
 import ServiceProviderManagement from './components/ServiceProviderManagement'
 import GuildManagement from './components/GuildManagement'
+import Settings from './components/Settings'
 import './App.css'
 
 function App() {
@@ -142,6 +143,12 @@ function App() {
             <GuildManagement />
           </div>
         )
+      case 'settings':
+        return (
+          <div className="content-view">
+            <Settings />
+          </div>
+        )
       default:
         return null
     }
@@ -176,6 +183,9 @@ function App() {
           </div>
           <div className="header-user">
             <span className="user-name">{currentUser}</span>
+            <button onClick={() => handleNavigate('settings')} className="settings-button" title="Einstellungen">
+              ⚙️
+            </button>
             <button onClick={handleLogout} className="logout-button">
               Abmelden
             </button>

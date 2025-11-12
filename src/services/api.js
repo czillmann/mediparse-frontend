@@ -965,3 +965,123 @@ export const deleteGuild = async (id) => {
     throw error;
   }
 };
+
+// ==================== Contract Price API ====================
+
+/**
+ * Gets all contract prices for a specific contract file
+ * @param {string} contractFileId - Contract file ID
+ * @returns {Promise<Array>} List of contract prices
+ */
+export const getContractPrices = async (contractFileId) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/contract-prices?contractFileId=${contractFileId}`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden der Vertragspreise (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+// ==================== User Management API ====================
+
+/**
+ * Gets all users for the current company
+ * @returns {Promise<Array>} List of users
+ */
+export const getUsers = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/users`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden der Benutzer (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Invites a new user to the company
+ * @param {Object} invitation - Invitation data
+ * @param {string} invitation.email - Email of the user to invite
+ * @param {string} invitation.temporaryPassword - Temporary password for the new user
+ * @returns {Promise<Object>} Created user
+ */
+export const inviteUser = async (invitation) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/users/invite`, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(invitation),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Einladen des Benutzers (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Deletes a user
+ * @param {string} userId - User ID
+ * @returns {Promise<void>}
+ */
+export const deleteUser = async (userId) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+      method: 'DELETE',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Löschen des Benutzers (Status: ${response.status})`);
+    }
+  } catch (error) {
+    throw error;
+  }
+};

@@ -90,6 +90,25 @@
   font-weight: 500;
 }
 
+.settings-button {
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  color: #667eea;
+  border: none;
+  border-radius: 8px;
+  font-size: 1.3rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-button:hover {
+  background: #f3f4f6;
+  transform: scale(1.1);
+}
+
 .logout-button {
   padding: 0.625rem 1.25rem;
   background: white;

@@ -235,8 +235,10 @@
   display: flex;
   gap: 0.5rem;
   align-items: center;
+  justify-content: flex-end;
 }
 
+.view-prices-button,
 .edit-button,
 .download-button,
 .delete-button {
@@ -251,6 +253,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.view-prices-button {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.view-prices-button:hover:not(:disabled) {
+  background-color: #fde68a;
+  transform: translateY(-1px);
 }
 
 .edit-button {
@@ -324,6 +336,7 @@
     gap: 0.25rem;
   }
 
+  .view-prices-button,
   .edit-button,
   .download-button,
   .delete-button {

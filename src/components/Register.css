@@ -140,6 +140,13 @@
   font-size: 1rem;
   transition: all 0.2s ease;
   background: #f9fafb;
+  color: #1f2937;
+  -webkit-text-fill-color: #1f2937;
+}
+
+.form-group input::placeholder {
+  color: #9ca3af;
+  opacity: 1;
 }
 
 .form-group input:focus {
@@ -147,6 +154,8 @@
   border-color: #667eea;
   background: white;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  color: #1f2937;
+  -webkit-text-fill-color: #1f2937;
 }
 
 .form-group input:disabled {

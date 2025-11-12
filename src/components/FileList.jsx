@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getContractFiles, deleteContractFile, downloadContractFile, updateContractFileOcrStatus } from '../services/api'
+import { getContractFiles, deleteContractFile, downloadContractFile, updateContractFileOcrStatus, updateContractFileStatus } from '../services/api'
 import ContractFileForm from './ContractFileForm'
 import './FileList.css'
 
@@ -10,6 +10,7 @@ function FileList({ refreshTrigger }) {
   const [deletingId, setDeletingId] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
   const [updatingOcrId, setUpdatingOcrId] = useState(null)
+  const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [editingFile, setEditingFile] = useState(null)
 
   const loadFiles = async () => {
@@ -79,6 +80,26 @@ function FileList({ refreshTrigger }) {
     }
   }
 
+  const handleResetStatus = async (id, fileName) => {
+    if (!confirm(`Status für "${fileName}" auf "Hochgeladen" zurücksetzen?`)) {
+      return
+    }
+
+    setUpdatingStatusId(id)
+
+    try {
+      const updatedFile = await updateContractFileStatus(id, 'UPLOADED')
+      // Update file in list
+      setFiles(files.map(file =>
+        file.id === id ? { ...file, status: updatedFile.status } : file
+      ))
+    } catch (err) {
+      alert(`Fehler beim Zurücksetzen des Status: ${err.message}`)
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }
+
   const handleSave = (updatedFile) => {
     // Update the file in the list
     setFiles(files.map(file =>
@@ -107,7 +128,8 @@ function FileList({ refreshTrigger }) {
     return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
   }
 
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (file) => {
+    const status = file.status
     const badges = {
       UPLOADED: { label: 'Hochgeladen', className: 'status-uploaded' },
       PROCESSING: { label: 'In Bearbeitung', className: 'status-processing' },
@@ -118,9 +140,21 @@ function FileList({ refreshTrigger }) {
     const badge = badges[status] || { label: status, className: 'status-unknown' }
 
     return (
-      <span className={`status-badge ${badge.className}`}>
-        {badge.label}
-      </span>
+      <div className="status-cell">
+        <span className={`status-badge ${badge.className}`}>
+          {badge.label}
+        </span>
+        {status === 'FAILED' && (
+          <button
+            className="reset-status-button"
+            onClick={() => handleResetStatus(file.id, file.fileName)}
+            disabled={updatingStatusId === file.id}
+            title="Status zurücksetzen"
+          >
+            {updatingStatusId === file.id ? '⏳' : '🔄'}
+          </button>
+        )}
+      </div>
     )
   }
 
@@ -226,7 +260,7 @@ function FileList({ refreshTrigger }) {
                   <span className="file-icon">📄</span>
                   <span>{file.fileName}</span>
                 </td>
-                <td>{getStatusBadge(file.status)}</td>
+                <td>{getStatusBadge(file)}</td>
                 <td>{getOcrStatusBadge(file)}</td>
                 <td>{formatFileSize(file.fileSize)}</td>
                 <td>{formatDate(file.uploadedAt)}</td>

@@ -194,12 +194,14 @@
   color: #6b21a8;
 }
 
+.status-cell,
 .ocr-status-cell {
   display: flex;
   align-items: center;
   gap: 0.5rem;
 }
 
+.reset-status-button,
 .reset-ocr-button {
   padding: 0.25rem 0.5rem;
   background-color: #e0e7ff;
@@ -216,11 +218,13 @@
   justify-content: center;
 }
 
+.reset-status-button:hover:not(:disabled),
 .reset-ocr-button:hover:not(:disabled) {
   background-color: #c7d2fe;
   transform: translateY(-1px);
 }
 
+.reset-status-button:disabled,
 .reset-ocr-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;

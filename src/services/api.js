@@ -1,6 +1,9 @@
 // API Configuration
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
+// Token refresh promise to prevent multiple simultaneous refresh requests
+let refreshPromise = null;
+
 /**
  * Gets the authentication token from localStorage
  * @returns {string|null} ID token (contains email) or null if not found
@@ -20,12 +23,122 @@ const getAuthToken = () => {
 };
 
 /**
- * Creates headers with authentication token
- * @param {Object} additionalHeaders - Additional headers to include
- * @returns {Object} Headers object
+ * Decodes a JWT token to get its payload
+ * @param {string} token - JWT token
+ * @returns {Object|null} Decoded payload
  */
-const getAuthHeaders = (additionalHeaders = {}) => {
-  const token = getAuthToken();
+const decodeToken = (token) => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(atob(parts[1]));
+    return payload;
+  } catch (error) {
+    console.error('Error decoding token:', error);
+    return null;
+  }
+};
+
+/**
+ * Checks if a token is expired or will expire soon (within 5 minutes)
+ * @param {string} token - JWT token
+ * @returns {boolean} True if token is expired or expiring soon
+ */
+const isTokenExpired = (token) => {
+  const payload = decodeToken(token);
+  if (!payload || !payload.exp) return true;
+
+  const now = Math.floor(Date.now() / 1000);
+  const expiresIn = payload.exp - now;
+
+  // Consider token expired if it expires in less than 5 minutes
+  return expiresIn < 300;
+};
+
+/**
+ * Refreshes the authentication tokens using the refresh token
+ * @returns {Promise<boolean>} True if refresh was successful
+ */
+const refreshAuthToken = async () => {
+  // If a refresh is already in progress, return that promise
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  try {
+    const authData = localStorage.getItem('mediparse_auth');
+    if (!authData) {
+      return false;
+    }
+
+    const parsed = JSON.parse(authData);
+    if (!parsed.refreshToken) {
+      return false;
+    }
+
+    // Start the refresh request
+    refreshPromise = fetch(`${API_BASE_URL}/api/users/refresh-token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken: parsed.refreshToken }),
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error('Token refresh failed');
+        }
+        return response.json();
+      })
+      .then((data) => {
+        // Update stored tokens
+        const updatedAuth = {
+          ...parsed,
+          accessToken: data.accessToken,
+          idToken: data.idToken,
+        };
+        localStorage.setItem('mediparse_auth', JSON.stringify(updatedAuth));
+        return true;
+      })
+      .catch((error) => {
+        console.error('Error refreshing token:', error);
+        // Clear auth data on refresh failure
+        localStorage.removeItem('mediparse_auth');
+        return false;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+
+    return await refreshPromise;
+  } catch (error) {
+    console.error('Error in refreshAuthToken:', error);
+    refreshPromise = null;
+    return false;
+  }
+};
+
+/**
+ * Creates headers with authentication token
+ * Automatically refreshes token if expired
+ * @param {Object} additionalHeaders - Additional headers to include
+ * @returns {Promise<Object>} Headers object
+ */
+const getAuthHeaders = async (additionalHeaders = {}) => {
+  let token = getAuthToken();
+
+  // Check if token is expired or expiring soon
+  if (token && isTokenExpired(token)) {
+    const refreshed = await refreshAuthToken();
+    if (refreshed) {
+      token = getAuthToken();
+    } else {
+      // Token refresh failed, redirect to login
+      window.location.href = '/';
+      throw new Error('Session abgelaufen. Bitte melden Sie sich erneut an.');
+    }
+  }
+
   const headers = {
     ...additionalHeaders
   };
@@ -191,9 +304,10 @@ export const uploadContractFile = async (file, onProgress) => {
  */
 export const getContractFiles = async () => {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/contract-files`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: headers,
       credentials: 'include',
     });
 
@@ -218,9 +332,10 @@ export const getContractFiles = async () => {
  */
 export const getContractFile = async (id) => {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/contract-files/${id}`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: headers,
       credentials: 'include',
     });
 
@@ -245,9 +360,10 @@ export const getContractFile = async (id) => {
  */
 export const deleteContractFile = async (id) => {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/contract-files/${id}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
+      headers: headers,
       credentials: 'include',
     });
 
@@ -271,11 +387,12 @@ export const deleteContractFile = async (id) => {
  */
 export const updateContractFileStatus = async (id, status) => {
   try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
     const response = await fetch(`${API_BASE_URL}/api/contract-files/${id}/status`, {
       method: 'PATCH',
-      headers: getAuthHeaders({
-        'Content-Type': 'application/json',
-      }),
+      headers: headers,
       credentials: 'include',
       body: JSON.stringify({ status }),
     });
@@ -295,6 +412,70 @@ export const updateContractFileStatus = async (id, status) => {
 };
 
 /**
+ * Updates the OCR status of a contract file
+ * @param {string} id - File ID
+ * @param {string} ocrStatus - New OCR status (OCR_REQUIRED, OCR_DONE, etc.)
+ * @returns {Promise<Object>} Updated file details
+ */
+/**
+ * Updates a contract file (relationships)
+ * @param {string} id - File ID
+ * @param {Object} updates - Object with healthInsuranceId, serviceProviderIds, guildIds
+ * @returns {Promise<Object>} Updated file details
+ */
+export const updateContractFile = async (id, updates) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/contract-files/${id}`, {
+      method: 'PATCH',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(updates),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Aktualisieren des Vertrags (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+export const updateContractFileOcrStatus = async (id, ocrStatus) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/contract-files/${id}/ocr-status`, {
+      method: 'PATCH',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify({ ocrStatus }),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Aktualisieren des OCR Status (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
  * Downloads a contract file
  * @param {string} id - File ID
  * @param {string} fileName - File name for download
@@ -302,9 +483,10 @@ export const updateContractFileStatus = async (id, status) => {
  */
 export const downloadContractFile = async (id, fileName) => {
   try {
+    const headers = await getAuthHeaders();
     const response = await fetch(`${API_BASE_URL}/api/contract-files/${id}/download`, {
       method: 'GET',
-      headers: getAuthHeaders(),
+      headers: headers,
       credentials: 'include',
     });
 
@@ -333,6 +515,452 @@ export const downloadContractFile = async (id, fileName) => {
     // Cleanup
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Creates a new health insurance company
+ * @param {Object} healthInsurance - Health insurance data
+ * @param {string} healthInsurance.name - Name of the health insurance
+ * @param {Object} healthInsurance.address - Address object
+ * @returns {Promise<Object>} Created health insurance
+ */
+export const createHealthInsurance = async (healthInsurance) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/health-insurances`, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(healthInsurance),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Anlegen der Krankenkasse (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Gets all health insurances for the current company
+ * @returns {Promise<Array>} List of health insurances
+ */
+export const getHealthInsurances = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/health-insurances`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden der Krankenkassen (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Gets a specific health insurance by ID
+ * @param {string} id - Health insurance ID
+ * @returns {Promise<Object>} Health insurance details
+ */
+export const getHealthInsurance = async (id) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/health-insurances/${id}`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden der Krankenkasse (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Updates an existing health insurance
+ * @param {string} id - Health insurance ID
+ * @param {Object} healthInsurance - Updated health insurance data
+ * @returns {Promise<Object>} Updated health insurance
+ */
+export const updateHealthInsurance = async (id, healthInsurance) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/health-insurances/${id}`, {
+      method: 'PUT',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(healthInsurance),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Aktualisieren der Krankenkasse (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Deletes a health insurance
+ * @param {string} id - Health insurance ID
+ * @returns {Promise<void>}
+ */
+export const deleteHealthInsurance = async (id) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/health-insurances/${id}`, {
+      method: 'DELETE',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Löschen der Krankenkasse (Status: ${response.status})`);
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Creates a new service provider
+ * @param {Object} serviceProvider - Service provider data
+ * @returns {Promise<Object>} Created service provider
+ */
+export const createServiceProvider = async (serviceProvider) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/service-providers`, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(serviceProvider),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Anlegen des Leistungserbringers (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Gets all service providers for the current company
+ * @returns {Promise<Array>} List of service providers
+ */
+export const getServiceProviders = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/service-providers`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden der Leistungserbringer (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Gets a specific service provider by ID
+ * @param {string} id - Service provider ID
+ * @returns {Promise<Object>} Service provider details
+ */
+export const getServiceProvider = async (id) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/service-providers/${id}`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden des Leistungserbringers (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Updates an existing service provider
+ * @param {string} id - Service provider ID
+ * @param {Object} serviceProvider - Updated service provider data
+ * @returns {Promise<Object>} Updated service provider
+ */
+export const updateServiceProvider = async (id, serviceProvider) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/service-providers/${id}`, {
+      method: 'PUT',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(serviceProvider),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Aktualisieren des Leistungserbringers (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Deletes a service provider
+ * @param {string} id - Service provider ID
+ * @returns {Promise<void>}
+ */
+export const deleteServiceProvider = async (id) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/service-providers/${id}`, {
+      method: 'DELETE',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Löschen des Leistungserbringers (Status: ${response.status})`);
+    }
+  } catch (error) {
+    throw error;
+  }
+};
+
+// ==================== Guild (Innung) API ====================
+
+/**
+ * Creates a new guild
+ * @param {Object} guild - Guild data (name, address)
+ * @returns {Promise<Object>} Created guild
+ */
+export const createGuild = async (guild) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/guilds`, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(guild),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Erstellen der Innung (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Gets all guilds for the current company
+ * @returns {Promise<Array>} List of guilds
+ */
+export const getGuilds = async () => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/guilds`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      throw new Error(`Fehler beim Laden der Innungen (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Gets a specific guild by ID
+ * @param {string} id - Guild ID
+ * @returns {Promise<Object>} Guild data
+ */
+export const getGuild = async (id) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/guilds/${id}`, {
+      method: 'GET',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Laden der Innung (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Updates an existing guild
+ * @param {string} id - Guild ID
+ * @param {Object} guild - Updated guild data
+ * @returns {Promise<Object>} Updated guild
+ */
+export const updateGuild = async (id, guild) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/guilds/${id}`, {
+      method: 'PUT',
+      headers: headers,
+      credentials: 'include',
+      body: JSON.stringify(guild),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Aktualisieren der Innung (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};
+
+/**
+ * Deletes a guild
+ * @param {string} id - Guild ID
+ * @returns {Promise<void>}
+ */
+export const deleteGuild = async (id) => {
+  try {
+    const headers = await getAuthHeaders();
+    const response = await fetch(`${API_BASE_URL}/api/guilds/${id}`, {
+      method: 'DELETE',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler beim Löschen der Innung (Status: ${response.status})`);
+    }
   } catch (error) {
     throw error;
   }

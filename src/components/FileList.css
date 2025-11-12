@@ -194,12 +194,46 @@
   color: #6b21a8;
 }
 
+.ocr-status-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.reset-ocr-button {
+  padding: 0.25rem 0.5rem;
+  background-color: #e0e7ff;
+  color: #3730a3;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reset-ocr-button:hover:not(:disabled) {
+  background-color: #c7d2fe;
+  transform: translateY(-1px);
+}
+
+.reset-ocr-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .action-buttons {
   display: flex;
   gap: 0.5rem;
   align-items: center;
 }
 
+.edit-button,
 .download-button,
 .delete-button {
   padding: 0.5rem;
@@ -213,6 +247,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.edit-button {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+}
+
+.edit-button:hover:not(:disabled) {
+  background-color: #c8e6c9;
+  transform: translateY(-1px);
 }
 
 .download-button {
@@ -276,6 +320,7 @@
     gap: 0.25rem;
   }
 
+  .edit-button,
   .download-button,
   .delete-button {
     font-size: 1rem;

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { getContractFiles, deleteContractFile, downloadContractFile } from '../services/api'
+import { getContractFiles, deleteContractFile, downloadContractFile, updateContractFileOcrStatus } from '../services/api'
+import ContractFileForm from './ContractFileForm'
 import './FileList.css'
 
 function FileList({ refreshTrigger }) {
@@ -8,6 +9,8 @@ function FileList({ refreshTrigger }) {
   const [error, setError] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
+  const [updatingOcrId, setUpdatingOcrId] = useState(null)
+  const [editingFile, setEditingFile] = useState(null)
 
   const loadFiles = async () => {
     setLoading(true)
@@ -56,6 +59,34 @@ function FileList({ refreshTrigger }) {
     }
   }
 
+  const handleResetOcrStatus = async (id, fileName) => {
+    if (!confirm(`OCR-Status für "${fileName}" auf "OCR erforderlich" zurücksetzen?`)) {
+      return
+    }
+
+    setUpdatingOcrId(id)
+
+    try {
+      const updatedFile = await updateContractFileOcrStatus(id, 'OCR_REQUIRED')
+      // Update file in list
+      setFiles(files.map(file =>
+        file.id === id ? { ...file, ocrStatus: updatedFile.ocrStatus } : file
+      ))
+    } catch (err) {
+      alert(`Fehler beim Zurücksetzen des OCR-Status: ${err.message}`)
+    } finally {
+      setUpdatingOcrId(null)
+    }
+  }
+
+  const handleSave = (updatedFile) => {
+    // Update the file in the list
+    setFiles(files.map(file =>
+      file.id === updatedFile.id ? updatedFile : file
+    ))
+    setEditingFile(null)
+  }
+
   const formatDate = (dateString) => {
     if (!dateString) return '-'
     const date = new Date(dateString)
@@ -93,7 +124,8 @@ function FileList({ refreshTrigger }) {
     )
   }
 
-  const getOcrStatusBadge = (ocrStatus) => {
+  const getOcrStatusBadge = (file) => {
+    const ocrStatus = file.ocrStatus
     const badges = {
       OCR_REQUIRED: { label: 'OCR erforderlich', className: 'ocr-required' },
       OCR_DONE: { label: 'OCR vorhanden', className: 'ocr-done' },
@@ -112,9 +144,21 @@ function FileList({ refreshTrigger }) {
     const badge = badges[ocrStatus] || { label: ocrStatus, className: 'ocr-unknown' }
 
     return (
-      <span className={`status-badge ${badge.className}`}>
-        {badge.label}
-      </span>
+      <div className="ocr-status-cell">
+        <span className={`status-badge ${badge.className}`}>
+          {badge.label}
+        </span>
+        {ocrStatus === 'OCR_DONE' && (
+          <button
+            className="reset-ocr-button"
+            onClick={() => handleResetOcrStatus(file.id, file.fileName)}
+            disabled={updatingOcrId === file.id}
+            title="OCR zurücksetzen"
+          >
+            {updatingOcrId === file.id ? '⏳' : '🔄'}
+          </button>
+        )}
+      </div>
     )
   }
 
@@ -183,11 +227,18 @@ function FileList({ refreshTrigger }) {
                   <span>{file.fileName}</span>
                 </td>
                 <td>{getStatusBadge(file.status)}</td>
-                <td>{getOcrStatusBadge(file.ocrStatus)}</td>
+                <td>{getOcrStatusBadge(file)}</td>
                 <td>{formatFileSize(file.fileSize)}</td>
                 <td>{formatDate(file.uploadedAt)}</td>
                 <td>
                   <div className="action-buttons">
+                    <button
+                      className="edit-button"
+                      onClick={() => setEditingFile(file)}
+                      title="Bearbeiten"
+                    >
+                      ✏️
+                    </button>
                     <button
                       className="download-button"
                       onClick={() => handleDownload(file.id, file.fileName)}
@@ -211,6 +262,14 @@ function FileList({ refreshTrigger }) {
           </tbody>
         </table>
       </div>
+
+      {editingFile && (
+        <ContractFileForm
+          contractFile={editingFile}
+          onSave={handleSave}
+          onCancel={() => setEditingFile(null)}
+        />
+      )}
     </div>
   )
 }

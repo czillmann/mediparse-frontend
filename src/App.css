@@ -78,6 +78,18 @@
   background-clip: text;
 }
 
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.user-name {
+  color: #6c757d;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
 .logout-button {
   padding: 0.625rem 1.25rem;
   background: white;
@@ -94,6 +106,10 @@
   background: #667eea;
   color: white;
   transform: translateY(-1px);
+}
+
+.content-view {
+  width: 100%;
 }
 
 .main-content {

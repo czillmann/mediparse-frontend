@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm:*)",
+      "Bash(npm install)",
+      "Bash(npm run dev:*)",
+      "Bash(nvm use:*)",
+      "Bash(source:*)",
+      "Bash(cat:*)",
+      "Bash(chmod:*)",
+      "Bash(./scripts/add-cognito-custom-attribute.sh:*)",
+      "Bash(./mvnw spring-boot:run:*)",
+      "Bash(export MAVEN_OPTS=\"-Dmaven.wagon.http.ssl.insecure=true -Dmaven.wagon.http.ssl.allowall=true\":*)",
+      "Bash(./mvnw clean install:*)",
+      "Bash(mvn spring-boot:run:*)",
+      "Bash(brew reinstall:*)",
+      "Bash(curl:*)",
+      "Bash(./mvnw clean:*)",
+      "Bash(./mvnw compile:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(/Users/christianzillmann/IdeaProjects/mediparse/scripts/enable-admin-auth-flow.sh:*)",
+      "Bash(kill:*)",
+      "Bash(pkill:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

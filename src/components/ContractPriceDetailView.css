@@ -344,24 +344,6 @@
   box-shadow: 0 2px 10px rgba(255, 255, 0, 1);
 }
 
-.pdf-highlight {
-  position: absolute;
-  background: rgba(255, 235, 59, 0.4);
-  border: 2px solid #fbc02d;
-  pointer-events: none;
-  z-index: 100;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 0.9;
-  }
-}
-
 .pdf-loading,
 .pdf-error {
   display: flex;

@@ -256,19 +256,6 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
                     renderAnnotationLayer={true}
                   />
                 </Document>
-
-                {/* Highlight overlay for selected price */}
-                {selectedPrice?.boundingBox && selectedPrice?.pageNumber === pageNumber && (
-                  <div
-                    className="pdf-highlight"
-                    style={{
-                      left: `${selectedPrice.boundingBox.left * 100}%`,
-                      top: `${selectedPrice.boundingBox.top * 100}%`,
-                      width: `${selectedPrice.boundingBox.width * 100}%`,
-                      height: `${selectedPrice.boundingBox.height * 100}%`,
-                    }}
-                  />
-                )}
               </div>
             ) : (
               <div className="pdf-error">

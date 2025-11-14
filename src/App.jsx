@@ -8,6 +8,7 @@ import HealthInsuranceManagement from './components/HealthInsuranceManagement'
 import ServiceProviderManagement from './components/ServiceProviderManagement'
 import GuildManagement from './components/GuildManagement'
 import Settings from './components/Settings'
+import ContractPriceDetailView from './components/ContractPriceDetailView'
 import './App.css'
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [currentView, setCurrentView] = useState('dashboard')
+  const [selectedContract, setSelectedContract] = useState(null)
 
   // Check for existing authentication on mount
   useEffect(() => {
@@ -72,6 +74,12 @@ function App() {
 
   const handleNavigate = (view) => {
     setCurrentView(view)
+    setSelectedContract(null)
+  }
+
+  const handleViewContractPrices = (contract) => {
+    setSelectedContract(contract)
+    setCurrentView('contract-prices')
   }
 
   const renderContent = () => {
@@ -89,7 +97,7 @@ function App() {
             </div>
 
             <div className="files-section">
-              <FileList refreshTrigger={refreshTrigger} />
+              <FileList refreshTrigger={refreshTrigger} onViewPrices={handleViewContractPrices} />
             </div>
 
             <div className="features-grid">
@@ -122,9 +130,17 @@ function App() {
       case 'contracts':
         return (
           <div className="content-view">
-            <FileList refreshTrigger={refreshTrigger} />
+            <FileList refreshTrigger={refreshTrigger} onViewPrices={handleViewContractPrices} />
           </div>
         )
+      case 'contract-prices':
+        return selectedContract ? (
+          <ContractPriceDetailView
+            contractFileId={selectedContract.id}
+            contractFileName={selectedContract.fileName}
+            onBack={() => handleNavigate('contracts')}
+          />
+        ) : null
       case 'insurances':
         return (
           <div className="content-view">

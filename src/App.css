@@ -131,6 +131,12 @@
   width: 100%;
 }
 
+.content-view.full-height {
+  padding: 0;
+  height: calc(100vh - 120px);
+  overflow: hidden;
+}
+
 .main-content {
   max-width: 1200px;
   margin: 0 auto;

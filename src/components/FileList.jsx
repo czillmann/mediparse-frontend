@@ -4,7 +4,7 @@ import ContractFileForm from './ContractFileForm'
 import ContractPriceTable from './ContractPriceTable'
 import './FileList.css'
 
-function FileList({ refreshTrigger }) {
+function FileList({ refreshTrigger, onViewPrices }) {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,7 +13,6 @@ function FileList({ refreshTrigger }) {
   const [updatingOcrId, setUpdatingOcrId] = useState(null)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
   const [editingFile, setEditingFile] = useState(null)
-  const [viewingPricesFile, setViewingPricesFile] = useState(null)
 
   const loadFiles = async () => {
     setLoading(true)
@@ -271,7 +270,7 @@ function FileList({ refreshTrigger }) {
                     {file.status === 'PROCESSED' && (
                       <button
                         className="view-prices-button"
-                        onClick={() => setViewingPricesFile(file)}
+                        onClick={() => onViewPrices && onViewPrices(file)}
                         title="Preise anzeigen"
                       >
                         💰
@@ -313,13 +312,6 @@ function FileList({ refreshTrigger }) {
           contractFile={editingFile}
           onSave={handleSave}
           onCancel={() => setEditingFile(null)}
-        />
-      )}
-
-      {viewingPricesFile && (
-        <ContractPriceTable
-          contractFileId={viewingPricesFile.id}
-          onClose={() => setViewingPricesFile(null)}
         />
       )}
     </div>

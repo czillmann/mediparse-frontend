@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import UserManagement from './UserManagement'
+import ProductGroupSettingsManagement from './ProductGroupSettingsManagement'
 import './Settings.css'
 
 const Settings = () => {
@@ -20,10 +21,18 @@ const Settings = () => {
             <span className="settings-tab-icon">👥</span>
             <span>Benutzerverwaltung</span>
           </button>
+          <button
+            className={`settings-tab ${activeTab === 'productgroups' ? 'active' : ''}`}
+            onClick={() => setActiveTab('productgroups')}
+          >
+            <span className="settings-tab-icon">📦</span>
+            <span>Produktgruppen</span>
+          </button>
         </div>
 
         <div className="settings-main">
           {activeTab === 'users' && <UserManagement />}
+          {activeTab === 'productgroups' && <ProductGroupSettingsManagement />}
         </div>
       </div>
     </div>

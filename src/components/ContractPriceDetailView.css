@@ -74,6 +74,11 @@
   flex: 1;
   overflow: hidden;
   height: 100%;
+  transition: grid-template-columns 0.3s ease;
+}
+
+.detail-content:has(.pdf-section.collapsed) {
+  grid-template-columns: 1fr 60px;
 }
 
 .prices-section,
@@ -140,13 +145,91 @@
   transition: all 0.2s;
 }
 
-.prices-table tbody tr:hover {
+.prices-table tbody tr.position-row {
+  background: white;
+  font-weight: 500;
+}
+
+.prices-table tbody tr.position-row:hover {
   background: #f8f9fa;
 }
 
-.prices-table tbody tr.selected {
+.prices-table tbody tr.price-row {
+  background: #fafafa;
+  font-size: 0.9rem;
+}
+
+.prices-table tbody tr.price-row:hover {
+  background: #f0f0f0;
+}
+
+.prices-table tbody tr.price-row.selected {
   background: #e3f2fd;
   border-left: 3px solid #1976d2;
+}
+
+.expand-cell {
+  width: 30px;
+  text-align: center;
+}
+
+.expand-icon {
+  color: #1976d2;
+  font-size: 0.8rem;
+  display: inline-block;
+  width: 15px;
+}
+
+.price-count-cell {
+  text-align: center;
+}
+
+.price-count-badge {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  background: #1976d2;
+  color: white;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  min-width: 25px;
+}
+
+.price-detail-cell {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding-left: 2rem !important;
+}
+
+.price-type-label,
+.insurance-label,
+.region-label,
+.supply-type-label {
+  padding: 0.2rem 0.5rem;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.price-type-label {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.insurance-label {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.region-label {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.supply-type-label {
+  background: #f3e5f5;
+  color: #7b1fa2;
 }
 
 .prices-table td {
@@ -174,6 +257,26 @@
 .page-cell {
   color: #7f8c8d;
   font-size: 0.9rem;
+}
+
+.tax-cell {
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.contribution-cell {
+  font-size: 0.9rem;
+}
+
+.cost-estimate-cell {
+  text-align: center;
+  font-weight: 500;
+}
+
+.date-cell {
+  color: #5f6368;
+  font-size: 0.85rem;
+  white-space: nowrap;
 }
 
 .source-badge {
@@ -208,6 +311,52 @@
 
 .pdf-section {
   position: relative;
+  transition: all 0.3s ease;
+}
+
+.pdf-section.collapsed {
+  width: 60px;
+  min-width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding-top: 0;
+  border-left: 2px solid #e0e0e0;
+}
+
+.pdf-section.collapsed .section-header {
+  width: 100%;
+  padding: 1rem 0.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdf-section.collapsed .section-header h3 {
+  display: none;
+}
+
+.pdf-section.collapsed .pdf-viewer-container,
+.pdf-section.collapsed .pdf-controls {
+  display: none;
+}
+
+.pdf-toggle-button {
+  padding: 0.4rem 0.8rem;
+  background: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.pdf-toggle-button:hover {
+  background: #0056b3;
+  transform: scale(1.05);
 }
 
 .pdf-controls {
@@ -431,4 +580,30 @@
   .description-cell {
     max-width: 150px;
   }
+}
+
+/* HMV Category Header Row */
+.category-header-row {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  cursor: default;
+}
+
+.category-header-row:hover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.category-header-cell {
+  padding: 1rem 1.5rem !important;
+  color: #ffffff !important;
+  font-size: 1.1rem;
+  text-align: left;
+  border-bottom: 3px solid #5568d3;
+}
+
+.category-header-cell strong {
+  color: #ffffff !important;
+}
+
+.category-header-cell span {
+  color: #ffffff !important;
 }

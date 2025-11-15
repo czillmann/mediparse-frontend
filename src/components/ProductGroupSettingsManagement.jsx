@@ -12,7 +12,6 @@ const ProductGroupSettingsManagement = () => {
   const [formData, setFormData] = useState({
     number: '',
     promptPositionExtraction: '',
-    promptHmvMapping: '',
     items: []
   })
 
@@ -50,7 +49,6 @@ const ProductGroupSettingsManagement = () => {
     setFormData({
       number: '',
       promptPositionExtraction: '',
-      promptHmvMapping: '',
       items: []
     })
     setShowModal(true)
@@ -61,7 +59,6 @@ const ProductGroupSettingsManagement = () => {
     setFormData({
       number: setting.number,
       promptPositionExtraction: setting.promptPositionExtraction || '',
-      promptHmvMapping: setting.promptHmvMapping || '',
       items: setting.items || []
     })
     setShowModal(true)
@@ -237,16 +234,6 @@ const ProductGroupSettingsManagement = () => {
                   value={formData.promptPositionExtraction}
                   onChange={(e) => setFormData({ ...formData, promptPositionExtraction: e.target.value })}
                   placeholder="Prompt für Position Extraction..."
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Prompt HMV Mapping</label>
-                <textarea
-                  rows="4"
-                  value={formData.promptHmvMapping}
-                  onChange={(e) => setFormData({ ...formData, promptHmvMapping: e.target.value })}
-                  placeholder="Prompt für HMV Mapping..."
                 />
               </div>
 

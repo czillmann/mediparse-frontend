@@ -154,6 +154,11 @@
   background: #f8f9fa;
 }
 
+.prices-table tbody tr.position-row.selected {
+  background: #e8f5e9;
+  border-left: 3px solid #4CAF50;
+}
+
 .prices-table tbody tr.price-row {
   background: #fafafa;
   font-size: 0.9rem;
@@ -606,4 +611,20 @@
 
 .category-header-cell span {
   color: #ffffff !important;
+}
+
+/* Price Highlight Animation */
+@keyframes pulse-highlight {
+  0%, 100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+}
+
+.price-highlight-box {
+  transition: all 0.3s ease;
 }

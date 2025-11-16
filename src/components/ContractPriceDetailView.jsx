@@ -12,12 +12,14 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
   const [error, setError] = useState(null)
   const [expandedPositions, setExpandedPositions] = useState(new Set())
   const [selectedPrice, setSelectedPrice] = useState(null)
+  const [selectedPosition, setSelectedPosition] = useState(null)
   const [pdfData, setPdfData] = useState(null)
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [scale, setScale] = useState(1.2)
   const [loadingPdf, setLoadingPdf] = useState(false)
   const [pdfCollapsed, setPdfCollapsed] = useState(false)
+  const [pageSize, setPageSize] = useState(null)
 
   useEffect(() => {
     loadPositions()
@@ -47,14 +49,36 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
     }
   }
 
-  const togglePosition = (positionId) => {
-    const newExpanded = new Set(expandedPositions)
-    if (newExpanded.has(positionId)) {
-      newExpanded.delete(positionId)
+  const handlePositionClick = (position) => {
+    const isCurrentlySelected = selectedPosition?.id === position.id
+    const isCurrentlyExpanded = expandedPositions.has(position.id)
+
+    if (!isCurrentlySelected) {
+      // First click: Select the position and highlight in PDF
+      console.log('First click - selecting position:', position.positionNumber)
+      setSelectedPosition(position)
+      setSelectedPrice(null) // Clear any selected price
+
+      if (position.pageNumber) {
+        setPageNumber(position.pageNumber)
+      }
+
+      if (!position.boundingBox) {
+        console.warn('⚠️ Position has no bounding box - cannot highlight in PDF')
+      }
+    } else if (!isCurrentlyExpanded) {
+      // Second click: Expand to show prices
+      console.log('Second click - expanding position:', position.positionNumber)
+      const newExpanded = new Set(expandedPositions)
+      newExpanded.add(position.id)
+      setExpandedPositions(newExpanded)
     } else {
-      newExpanded.add(positionId)
+      // Third click: Collapse
+      console.log('Third click - collapsing position:', position.positionNumber)
+      const newExpanded = new Set(expandedPositions)
+      newExpanded.delete(position.id)
+      setExpandedPositions(newExpanded)
     }
-    setExpandedPositions(newExpanded)
   }
 
   const loadPdfData = async () => {
@@ -86,10 +110,35 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
     setNumPages(numPages)
   }
 
+  const onPageLoadSuccess = (page) => {
+    const { width, height } = page
+    setPageSize({ width, height })
+    console.log('PDF Page loaded:', { width, height, scale })
+  }
+
   const handlePriceSelect = (price) => {
+    console.log('Price selected:', {
+      id: price.id,
+      positionNumber: price.positionNumber,
+      price: price.price,
+      region: price.region,
+      priceType: price.priceType,
+      pageNumber: price.pageNumber,
+      boundingBox: price.boundingBox,
+      columnIndex: price.columnIndex,
+      rowIndex: price.rowIndex
+    })
+
+    // Clear any selected position
+    setSelectedPosition(null)
     setSelectedPrice(price)
+
     if (price.pageNumber) {
       setPageNumber(price.pageNumber)
+    }
+
+    if (!price.boundingBox) {
+      console.warn('⚠️ Price has no bounding box - cannot highlight in PDF')
     }
   }
 
@@ -319,8 +368,8 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
                             {/* Position Row */}
                             <tr
                               key={position.id}
-                              className="position-row"
-                              onClick={() => togglePosition(position.id)}
+                              className={`position-row ${selectedPosition?.id === position.id ? 'selected' : ''}`}
+                              onClick={() => handlePositionClick(position)}
                             >
                               <td className="expand-cell">
                                 <span className="expand-icon">
@@ -363,7 +412,6 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
                                 <td colSpan="3" className="price-detail-cell">
                                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
                                     {price.priceType && <span className="price-type-label">{price.priceType}</span>}
-                                    {price.insuranceCompany && <span className="insurance-label">{price.insuranceCompany}</span>}
                                     {price.region && <span className="region-label">{price.region}</span>}
                                   </div>
                                   <div style={{ display: 'flex', gap: '2rem', fontSize: '0.95rem', flexWrap: 'nowrap' }}>
@@ -438,7 +486,7 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
                 <p>Lade PDF...</p>
               </div>
             ) : pdfData ? (
-              <div className="pdf-canvas-wrapper">
+              <div className="pdf-canvas-wrapper" style={{ position: 'relative' }}>
                 <Document
                   file={pdfData}
                   onLoadSuccess={onDocumentLoadSuccess}
@@ -459,8 +507,52 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
                     scale={scale}
                     renderTextLayer={true}
                     renderAnnotationLayer={true}
+                    onLoadSuccess={onPageLoadSuccess}
                   />
                 </Document>
+                {/* Highlight overlay for selected position (whole row) */}
+                {selectedPosition &&
+                 selectedPosition.pageNumber === pageNumber &&
+                 selectedPosition.boundingBox && (
+                  <div
+                    className="position-highlight-box"
+                    style={{
+                      position: 'absolute',
+                      left: `${selectedPosition.boundingBox.left * 100}%`,
+                      top: `${selectedPosition.boundingBox.top * 100}%`,
+                      width: `${selectedPosition.boundingBox.width * 100}%`,
+                      height: `${selectedPosition.boundingBox.height * 100}%`,
+                      border: '3px solid #4CAF50',
+                      backgroundColor: 'rgba(76, 175, 80, 0.2)',
+                      pointerEvents: 'none',
+                      zIndex: 1000,
+                      boxShadow: '0 0 10px rgba(76, 175, 80, 0.5)',
+                      animation: 'pulse-highlight 1.5s ease-in-out infinite'
+                    }}
+                  />
+                )}
+
+                {/* Highlight overlay for selected price (specific cell) */}
+                {selectedPrice &&
+                 selectedPrice.pageNumber === pageNumber &&
+                 selectedPrice.boundingBox && (
+                  <div
+                    className="price-highlight-box"
+                    style={{
+                      position: 'absolute',
+                      left: `${selectedPrice.boundingBox.left * 100}%`,
+                      top: `${selectedPrice.boundingBox.top * 100}%`,
+                      width: `${selectedPrice.boundingBox.width * 100}%`,
+                      height: `${selectedPrice.boundingBox.height * 100}%`,
+                      border: '3px solid #ff6b6b',
+                      backgroundColor: 'rgba(255, 107, 107, 0.2)',
+                      pointerEvents: 'none',
+                      zIndex: 1000,
+                      boxShadow: '0 0 10px rgba(255, 107, 107, 0.5)',
+                      animation: 'pulse-highlight 1.5s ease-in-out infinite'
+                    }}
+                  />
+                )}
               </div>
             ) : (
               <div className="pdf-error">

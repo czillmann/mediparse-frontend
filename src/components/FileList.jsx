@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { getContractFiles, deleteContractFile, downloadContractFile, updateContractFileOcrStatus, updateContractFileStatus } from '../services/api'
+import { getContractFiles, deleteContractFile, downloadContractFile, updateContractFileOcrStatus, updateContractFileStatus, approvePrecheck, resetExtraction } from '../services/api'
 import ContractFileForm from './ContractFileForm'
 import ContractPriceTable from './ContractPriceTable'
+import ExtractionRulesDialog from './ExtractionRulesDialog'
 import './FileList.css'
 
 function FileList({ refreshTrigger, onViewPrices }) {
@@ -12,7 +13,14 @@ function FileList({ refreshTrigger, onViewPrices }) {
   const [downloadingId, setDownloadingId] = useState(null)
   const [updatingOcrId, setUpdatingOcrId] = useState(null)
   const [updatingStatusId, setUpdatingStatusId] = useState(null)
+  const [approvingId, setApprovingId] = useState(null)
+  const [resettingId, setResettingId] = useState(null)
   const [editingFile, setEditingFile] = useState(null)
+  const [editingRulesFile, setEditingRulesFile] = useState(null)
+  const [showApprovalDialog, setShowApprovalDialog] = useState(false)
+  const [fileToApprove, setFileToApprove] = useState(null)
+  const [showResetDialog, setShowResetDialog] = useState(false)
+  const [fileToReset, setFileToReset] = useState(null)
 
   const loadFiles = async () => {
     setLoading(true)
@@ -107,6 +115,76 @@ function FileList({ refreshTrigger, onViewPrices }) {
       file.id === updatedFile.id ? updatedFile : file
     ))
     setEditingFile(null)
+  }
+
+  const handleRulesSave = (updatedFile) => {
+    // Update the file in the list
+    setFiles(files.map(file =>
+      file.id === updatedFile.id ? updatedFile : file
+    ))
+    setEditingRulesFile(null)
+  }
+
+  const handleApproveClick = (file) => {
+    setFileToApprove(file)
+    setShowApprovalDialog(true)
+  }
+
+  const handleApproveConfirm = async () => {
+    if (!fileToApprove) return
+
+    setApprovingId(fileToApprove.id)
+    setShowApprovalDialog(false)
+
+    try {
+      const updatedFile = await approvePrecheck(fileToApprove.id)
+      // Update file in list
+      setFiles(files.map(file =>
+        file.id === fileToApprove.id ? updatedFile : file
+      ))
+      alert('Extraktion wurde gestartet!')
+    } catch (err) {
+      alert(`Fehler beim Freigeben der Extraktion: ${err.message}`)
+    } finally {
+      setApprovingId(null)
+      setFileToApprove(null)
+    }
+  }
+
+  const handleApproveCancel = () => {
+    setShowApprovalDialog(false)
+    setFileToApprove(null)
+  }
+
+  const handleResetClick = (file) => {
+    setFileToReset(file)
+    setShowResetDialog(true)
+  }
+
+  const handleResetConfirm = async () => {
+    if (!fileToReset) return
+
+    setResettingId(fileToReset.id)
+    setShowResetDialog(false)
+
+    try {
+      const updatedFile = await resetExtraction(fileToReset.id)
+      // Update file in list
+      setFiles(files.map(file =>
+        file.id === fileToReset.id ? updatedFile : file
+      ))
+      alert('Extraktion wurde zurückgesetzt. Status ist nun PRECHECK_DONE.')
+    } catch (err) {
+      alert(`Fehler beim Zurücksetzen der Extraktion: ${err.message}`)
+    } finally {
+      setResettingId(null)
+      setFileToReset(null)
+    }
+  }
+
+  const handleResetCancel = () => {
+    setShowResetDialog(false)
+    setFileToReset(null)
   }
 
   const formatDate = (dateString) => {
@@ -268,14 +346,41 @@ function FileList({ refreshTrigger, onViewPrices }) {
                 <td>
                   <div className="action-buttons">
                     {file.status === 'PROCESSED' && (
+                      <>
+                        <button
+                          className="view-prices-button"
+                          onClick={() => onViewPrices && onViewPrices(file)}
+                          title="Preise anzeigen"
+                        >
+                          💰
+                        </button>
+                        <button
+                          className="reset-button"
+                          onClick={() => handleResetClick(file)}
+                          disabled={resettingId === file.id}
+                          title="Extraktion zurücksetzen"
+                        >
+                          {resettingId === file.id ? '⏳' : '🔄'}
+                        </button>
+                      </>
+                    )}
+                    {file.status === 'PRECHECK_DONE' && (
                       <button
-                        className="view-prices-button"
-                        onClick={() => onViewPrices && onViewPrices(file)}
-                        title="Preise anzeigen"
+                        className="approve-button"
+                        onClick={() => handleApproveClick(file)}
+                        disabled={approvingId === file.id}
+                        title="Extraktion starten"
                       >
-                        💰
+                        {approvingId === file.id ? '⏳' : '▶️'}
                       </button>
                     )}
+                    <button
+                      className="extraction-rules-button"
+                      onClick={() => setEditingRulesFile(file)}
+                      title="Extraction Rules bearbeiten"
+                    >
+                      ⚙️
+                    </button>
                     <button
                       className="edit-button"
                       onClick={() => setEditingFile(file)}
@@ -313,6 +418,81 @@ function FileList({ refreshTrigger, onViewPrices }) {
           onSave={handleSave}
           onCancel={() => setEditingFile(null)}
         />
+      )}
+
+      {editingRulesFile && (
+        <ExtractionRulesDialog
+          contractFile={editingRulesFile}
+          onSave={handleRulesSave}
+          onClose={() => setEditingRulesFile(null)}
+        />
+      )}
+
+      {showApprovalDialog && fileToApprove && (
+        <div className="dialog-overlay">
+          <div className="approval-dialog">
+            <div className="dialog-header">
+              <h2>Extraktion starten</h2>
+            </div>
+            <div className="dialog-body">
+              <p>
+                Haben Sie die Extraktionsregeln für <strong>{fileToApprove.fileName}</strong> überprüft und möchten die Extraktion jetzt starten?
+              </p>
+              <p className="warning-text">
+                ⚠️ Stellen Sie sicher, dass die Regeln korrekt konfiguriert sind, bevor Sie fortfahren.
+              </p>
+            </div>
+            <div className="dialog-footer">
+              <button
+                className="cancel-button"
+                onClick={handleApproveCancel}
+              >
+                Abbrechen
+              </button>
+              <button
+                className="confirm-button"
+                onClick={handleApproveConfirm}
+              >
+                Ja, Extraktion starten
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showResetDialog && fileToReset && (
+        <div className="dialog-overlay">
+          <div className="reset-dialog">
+            <div className="dialog-header">
+              <h2>⚠️ Extraktion zurücksetzen</h2>
+            </div>
+            <div className="dialog-body">
+              <p>
+                Möchten Sie die Extraktion für <strong>{fileToReset.fileName}</strong> wirklich zurücksetzen?
+              </p>
+              <p className="danger-text">
+                🚨 <strong>ACHTUNG:</strong> Alle extrahierten Positionen und Preise werden unwiderruflich gelöscht!
+              </p>
+              <p>
+                Der Status wird auf PRECHECK_DONE zurückgesetzt und Sie können die Extraktion mit angepassten Regeln erneut durchführen.
+              </p>
+            </div>
+            <div className="dialog-footer">
+              <button
+                className="cancel-button"
+                onClick={handleResetCancel}
+              >
+                Abbrechen
+              </button>
+              <button
+                className="danger-button"
+                onClick={handleResetConfirm}
+              >
+                Ja, zurücksetzen und Daten löschen
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

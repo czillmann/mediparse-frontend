@@ -239,6 +239,9 @@
 }
 
 .view-prices-button,
+.approve-button,
+.reset-button,
+.extraction-rules-button,
 .edit-button,
 .download-button,
 .delete-button {
@@ -262,6 +265,36 @@
 
 .view-prices-button:hover:not(:disabled) {
   background-color: #fde68a;
+  transform: translateY(-1px);
+}
+
+.approve-button {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.approve-button:hover:not(:disabled) {
+  background-color: #a7f3d0;
+  transform: translateY(-1px);
+}
+
+.reset-button {
+  background-color: #ffe4e6;
+  color: #9f1239;
+}
+
+.reset-button:hover:not(:disabled) {
+  background-color: #fecdd3;
+  transform: translateY(-1px);
+}
+
+.extraction-rules-button {
+  background-color: #e0e7ff;
+  color: #3730a3;
+}
+
+.extraction-rules-button:hover:not(:disabled) {
+  background-color: #c7d2fe;
   transform: translateY(-1px);
 }
 
@@ -337,6 +370,7 @@
   }
 
   .view-prices-button,
+  .extraction-rules-button,
   .edit-button,
   .download-button,
   .delete-button {
@@ -355,4 +389,134 @@
   .file-table {
     min-width: 600px;
   }
+}
+
+/* Approval Dialog */
+.approval-dialog {
+  background: white;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.approval-dialog .dialog-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.approval-dialog .dialog-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.approval-dialog .dialog-body {
+  padding: 24px;
+}
+
+.approval-dialog .dialog-body p {
+  margin: 0 0 16px 0;
+  color: #555;
+  line-height: 1.6;
+}
+
+.approval-dialog .warning-text {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 12px;
+  border-radius: 4px;
+  margin: 0;
+}
+
+.approval-dialog .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.confirm-button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  background: #4CAF50;
+  color: white;
+}
+
+.confirm-button:hover {
+  background: #45a049;
+}
+
+/* Reset Dialog */
+.reset-dialog {
+  background: white;
+  border-radius: 8px;
+  width: 100%;
+  max-width: 550px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.reset-dialog .dialog-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  background: #fff5f5;
+}
+
+.reset-dialog .dialog-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #c53030;
+  font-weight: 600;
+}
+
+.reset-dialog .dialog-body {
+  padding: 24px;
+}
+
+.reset-dialog .dialog-body p {
+  margin: 0 0 16px 0;
+  color: #555;
+  line-height: 1.6;
+}
+
+.reset-dialog .danger-text {
+  background: #fee;
+  border: 2px solid #f56565;
+  color: #c53030;
+  padding: 12px;
+  border-radius: 4px;
+  margin: 16px 0;
+  font-weight: 500;
+}
+
+.reset-dialog .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 24px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.danger-button {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+  background: #e53e3e;
+  color: white;
+}
+
+.danger-button:hover {
+  background: #c53030;
 }

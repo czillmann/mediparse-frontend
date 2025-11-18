@@ -231,7 +231,28 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
     setError(null)
 
     try {
-      const updatedFile = await updateExtractionRules(contractFile.id, rules)
+      // Clean up old top-level fields - only keep contractMetadata and tableTypes
+      const cleanRules = {
+        contractMetadata: rules.contractMetadata,
+        tableTypes: rules.tableTypes?.map(tableType => {
+          // Remove deprecated headerColumns field that might conflict with columns
+          const { headerColumns, ...cleanTableType } = tableType
+          return cleanTableType
+        })
+      }
+
+      console.log('=== FULL RULES STATE BEFORE SAVE ===')
+      console.log(JSON.stringify(rules, null, 2))
+      console.log('=== CLEANED RULES TO SEND ===')
+      console.log(JSON.stringify(cleanRules, null, 2))
+      console.log('=== COLUMNS SPECIFICALLY ===')
+      if (cleanRules.tableTypes && cleanRules.tableTypes[0]) {
+        cleanRules.tableTypes[0].columns?.forEach((col, idx) => {
+          console.log(`Column ${idx}: name="${col.name}", mappedTo="${col.mappedTo}"`)
+        })
+      }
+
+      const updatedFile = await updateExtractionRules(contractFile.id, cleanRules)
       onSave && onSave(updatedFile)
       onClose()
     } catch (err) {
@@ -252,19 +273,21 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
   }
 
   const updateValidationRule = (field, value) => {
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
     updateSelectedTableType({
       validationRules: {
-        ...rules.tableTypes[selectedTableTypeIndex].validationRules,
+        ...(currentTableType.validationRules || {}),
         [field]: value === '' ? null : (field === 'positionNumberPattern' ? value : parseInt(value))
       }
     })
   }
 
   const updateMultiPriceConfig = (field, value) => {
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
     updateSelectedTableType({
       multiPriceConfig: {
-        ...rules.tableTypes[selectedTableTypeIndex].multiPriceConfig,
-        [field]: field === 'hasMultiplePrices' ? value : rules.tableTypes[selectedTableTypeIndex].multiPriceConfig[field]
+        ...(currentTableType.multiPriceConfig || {}),
+        [field]: field === 'hasMultiplePrices' ? value : (currentTableType.multiPriceConfig?.[field] || null)
       }
     })
   }
@@ -438,6 +461,8 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
     currentColumns.forEach((col, idx) => {
       col.index = idx
     })
+    console.log('Updating column', columnIndex, field, '=', value)
+    console.log('Updated columns:', currentColumns)
     updateSelectedTableType({
       columns: currentColumns
     })

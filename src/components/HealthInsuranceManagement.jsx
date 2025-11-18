@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import HealthInsuranceList from './HealthInsuranceList';
 import HealthInsuranceForm from './HealthInsuranceForm';
 
-function HealthInsuranceManagement() {
+function HealthInsuranceManagement({ onViewDetail, insuranceToEdit }) {
   const [showForm, setShowForm] = useState(false);
   const [editingInsurance, setEditingInsurance] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // If insuranceToEdit is provided from parent, open form
+  useEffect(() => {
+    if (insuranceToEdit) {
+      setEditingInsurance(insuranceToEdit);
+      setShowForm(true);
+    }
+  }, [insuranceToEdit]);
 
   const handleAdd = () => {
     setEditingInsurance(null);
@@ -35,6 +43,7 @@ function HealthInsuranceManagement() {
         key={refreshKey}
         onAdd={handleAdd}
         onEdit={handleEdit}
+        onViewDetail={onViewDetail}
       />
       {showForm && (
         <HealthInsuranceForm

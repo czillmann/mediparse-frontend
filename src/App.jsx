@@ -5,8 +5,11 @@ import FileUpload from './components/FileUpload'
 import FileList from './components/FileList'
 import Navigation from './components/Navigation'
 import HealthInsuranceManagement from './components/HealthInsuranceManagement'
+import HealthInsuranceDetail from './components/HealthInsuranceDetail'
 import ServiceProviderManagement from './components/ServiceProviderManagement'
+import ServiceProviderDetail from './components/ServiceProviderDetail'
 import GuildManagement from './components/GuildManagement'
+import GuildDetail from './components/GuildDetail'
 import Settings from './components/Settings'
 import ContractPriceDetailView from './components/ContractPriceDetailView'
 import './App.css'
@@ -19,6 +22,12 @@ function App() {
   const [isLoading, setIsLoading] = useState(true)
   const [currentView, setCurrentView] = useState('dashboard')
   const [selectedContract, setSelectedContract] = useState(null)
+  const [selectedInsurance, setSelectedInsurance] = useState(null)
+  const [insuranceToEdit, setInsuranceToEdit] = useState(null)
+  const [selectedProvider, setSelectedProvider] = useState(null)
+  const [providerToEdit, setProviderToEdit] = useState(null)
+  const [selectedGuild, setSelectedGuild] = useState(null)
+  const [guildToEdit, setGuildToEdit] = useState(null)
 
   // Check for existing authentication on mount
   useEffect(() => {
@@ -75,11 +84,47 @@ function App() {
   const handleNavigate = (view) => {
     setCurrentView(view)
     setSelectedContract(null)
+    setSelectedInsurance(null)
+    setInsuranceToEdit(null)
+    setSelectedProvider(null)
+    setProviderToEdit(null)
+    setSelectedGuild(null)
+    setGuildToEdit(null)
   }
 
   const handleViewContractPrices = (contract) => {
     setSelectedContract(contract)
     setCurrentView('contract-prices')
+  }
+
+  const handleViewInsuranceDetail = (insurance) => {
+    setSelectedInsurance(insurance)
+    setCurrentView('insurance-detail')
+  }
+
+  const handleEditInsurance = (insurance) => {
+    setInsuranceToEdit(insurance)
+    setCurrentView('insurances')
+  }
+
+  const handleViewProviderDetail = (provider) => {
+    setSelectedProvider(provider)
+    setCurrentView('provider-detail')
+  }
+
+  const handleEditProvider = (provider) => {
+    setProviderToEdit(provider)
+    setCurrentView('providers')
+  }
+
+  const handleViewGuildDetail = (guild) => {
+    setSelectedGuild(guild)
+    setCurrentView('guild-detail')
+  }
+
+  const handleEditGuild = (guild) => {
+    setGuildToEdit(guild)
+    setCurrentView('guilds')
   }
 
   const renderContent = () => {
@@ -144,21 +189,54 @@ function App() {
       case 'insurances':
         return (
           <div className="content-view">
-            <HealthInsuranceManagement />
+            <HealthInsuranceManagement
+              onViewDetail={handleViewInsuranceDetail}
+              insuranceToEdit={insuranceToEdit}
+            />
           </div>
         )
+      case 'insurance-detail':
+        return selectedInsurance ? (
+          <HealthInsuranceDetail
+            insuranceId={selectedInsurance.id}
+            onBack={() => handleNavigate('insurances')}
+            onEdit={handleEditInsurance}
+          />
+        ) : null
       case 'providers':
         return (
           <div className="content-view">
-            <ServiceProviderManagement />
+            <ServiceProviderManagement
+              onViewDetail={handleViewProviderDetail}
+              providerToEdit={providerToEdit}
+            />
           </div>
         )
+      case 'provider-detail':
+        return selectedProvider ? (
+          <ServiceProviderDetail
+            providerId={selectedProvider.id}
+            onBack={() => handleNavigate('providers')}
+            onEdit={handleEditProvider}
+          />
+        ) : null
       case 'guilds':
         return (
           <div className="content-view">
-            <GuildManagement />
+            <GuildManagement
+              onViewDetail={handleViewGuildDetail}
+              guildToEdit={guildToEdit}
+            />
           </div>
         )
+      case 'guild-detail':
+        return selectedGuild ? (
+          <GuildDetail
+            guildId={selectedGuild.id}
+            onBack={() => handleNavigate('guilds')}
+            onEdit={handleEditGuild}
+          />
+        ) : null
       case 'settings':
         return (
           <div className="content-view">

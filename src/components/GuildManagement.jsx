@@ -1,11 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import GuildList from './GuildList';
 import GuildForm from './GuildForm';
 
-function GuildManagement() {
+function GuildManagement({ onViewDetail, guildToEdit }) {
   const [showForm, setShowForm] = useState(false);
   const [editingGuild, setEditingGuild] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // If guildToEdit is provided from parent, open form
+  useEffect(() => {
+    if (guildToEdit) {
+      setEditingGuild(guildToEdit);
+      setShowForm(true);
+    }
+  }, [guildToEdit]);
 
   const handleAdd = () => {
     setEditingGuild(null);
@@ -35,6 +43,7 @@ function GuildManagement() {
         key={refreshKey}
         onAdd={handleAdd}
         onEdit={handleEdit}
+        onViewDetail={onViewDetail}
       />
       {showForm && (
         <GuildForm

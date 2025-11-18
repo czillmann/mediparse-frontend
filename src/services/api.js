@@ -1235,3 +1235,29 @@ export const updateExtractionRules = async (contractFileId, extractionRules) => 
     throw error;
   }
 };
+
+export const detectTableTypes = async (contractFileId) => {
+  try {
+    const headers = await getAuthHeaders({
+      'Content-Type': 'application/json',
+    });
+    const response = await fetch(`${API_BASE_URL}/api/contract-files/${contractFileId}/detect-table-types`, {
+      method: 'POST',
+      headers: headers,
+      credentials: 'include',
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('Nicht authentifiziert. Bitte melden Sie sich erneut an.');
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Fehler bei der Tabellentyp-Erkennung (Status: ${response.status})`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw error;
+  }
+};

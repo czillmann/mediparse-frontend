@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getGuilds, deleteGuild } from '../services/api';
+import { getGuilds } from '../services/api';
 import './GuildList.css';
 
-function GuildList({ onAdd, onEdit }) {
+function GuildList({ onAdd, onViewDetail }) {
   const [guilds, setGuilds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     loadGuilds();
@@ -22,22 +21,6 @@ function GuildList({ onAdd, onEdit }) {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Möchten Sie die Innung "${name}" wirklich löschen?`)) {
-      return;
-    }
-
-    setDeletingId(id);
-    try {
-      await deleteGuild(id);
-      setGuilds(guilds.filter(guild => guild.id !== id));
-    } catch (err) {
-      alert(`Fehler beim Löschen: ${err.message}`);
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -88,7 +71,11 @@ function GuildList({ onAdd, onEdit }) {
       ) : (
         <div className="guild-grid">
           {guilds.map((guild) => (
-            <div key={guild.id} className="guild-card">
+            <div
+              key={guild.id}
+              className="guild-card clickable"
+              onClick={() => onViewDetail(guild)}
+            >
               <div className="guild-card-header">
                 <h3>{guild.name}</h3>
               </div>
@@ -99,20 +86,7 @@ function GuildList({ onAdd, onEdit }) {
                 </div>
               </div>
               <div className="guild-card-footer">
-                <button
-                  className="btn-secondary"
-                  onClick={() => onEdit(guild)}
-                  disabled={deletingId === guild.id}
-                >
-                  Bearbeiten
-                </button>
-                <button
-                  className="btn-danger"
-                  onClick={() => handleDelete(guild.id, guild.name)}
-                  disabled={deletingId === guild.id}
-                >
-                  {deletingId === guild.id ? 'Löschen...' : 'Löschen'}
-                </button>
+                <span className="view-details">Details ansehen →</span>
               </div>
             </div>
           ))}

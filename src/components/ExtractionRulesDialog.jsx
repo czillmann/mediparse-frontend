@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { getExtractionRules, updateExtractionRules } from '../services/api'
+import { getExtractionRules, updateExtractionRules, detectTableTypes } from '../services/api'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -13,7 +13,8 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
-  const [activeTab, setActiveTab] = useState('columnMappings')
+  const [activeTab, setActiveTab] = useState('tableTypeConfig')
+  const [selectedTableTypeIndex, setSelectedTableTypeIndex] = useState(0)
   const [numPages, setNumPages] = useState(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [pdfUrl, setPdfUrl] = useState(null)
@@ -30,20 +31,147 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
 
     try {
       const data = await getExtractionRules(contractFile.id)
-      // Initialize with empty structure if no rules exist
-      setRules(data || {
-        columnMappings: {},
-        transformationRules: {},
-        multiPriceConfig: { hasMultiplePrices: false, priceColumns: [] },
-        contractMetadata: {},
-        validationRules: { validityDateRules: {} },
-        conditionalRules: []
-      })
+
+      // If no rules exist, automatically detect table types
+      if (!data) {
+        try {
+          const detectionResult = await detectTableTypes(contractFile.id)
+
+          if (detectionResult.tableTypes && detectionResult.tableTypes.length > 0) {
+            setRules({
+              contractMetadata: {},
+              tableTypes: detectionResult.tableTypes
+            })
+          } else {
+            // Fallback to default
+            setRules({
+              contractMetadata: {},
+              tableTypes: [{
+                tableTypeId: 'default',
+                tableName: 'Haupttabelle',
+                headerMatcher: {
+                  requiredHeaders: [],
+                  optionalHeaders: [],
+                  matchingStrategy: 'ALL_REQUIRED',
+                  minimumMatchCount: 0,
+                  explanation: ''
+                },
+                transformationRules: {},
+                multiPriceConfig: { hasMultiplePrices: false, priceColumns: [] },
+                validationRules: { validityDateRules: {} },
+                conditionalRules: []
+              }]
+            })
+          }
+        } catch (detectionError) {
+          console.error('Fehler bei automatischer Tabellentyp-Erkennung:', detectionError)
+          // Fallback to default
+          setRules({
+            contractMetadata: {},
+            tableTypes: [{
+              tableTypeId: 'default',
+              tableName: 'Haupttabelle',
+              headerMatcher: {
+                requiredHeaders: [],
+                optionalHeaders: [],
+                matchingStrategy: 'ALL_REQUIRED',
+                minimumMatchCount: 0,
+                explanation: ''
+              },
+              transformationRules: {},
+              multiPriceConfig: { hasMultiplePrices: false, priceColumns: [] },
+              validationRules: { validityDateRules: {} },
+              conditionalRules: []
+            }]
+          })
+        }
+      } else {
+        // Migrate old structure to new structure if needed
+        if (!data.tableTypes) {
+          // Old structure detected - migrate to new structure
+          setRules({
+            contractMetadata: data.contractMetadata || {},
+            tableTypes: [{
+              tableTypeId: 'default',
+              tableName: 'Haupttabelle',
+              headerMatcher: {
+                requiredHeaders: [],
+                optionalHeaders: [],
+                matchingStrategy: 'ALL_REQUIRED',
+                minimumMatchCount: 0,
+                explanation: ''
+              },
+              transformationRules: data.transformationRules || {},
+              multiPriceConfig: data.multiPriceConfig || { hasMultiplePrices: false, priceColumns: [] },
+              validationRules: data.validationRules || { validityDateRules: {} },
+              conditionalRules: data.conditionalRules || []
+            }]
+          })
+        } else {
+          // New structure already present
+          setRules(data)
+        }
+      }
     } catch (err) {
       setError(err.message)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Table Type Management Functions
+  const addTableType = () => {
+    const newTableType = {
+      tableTypeId: `table_type_${Date.now()}`,
+      tableName: 'Neue Tabelle',
+      headerMatcher: {
+        requiredHeaders: [],
+        optionalHeaders: [],
+        matchingStrategy: 'ALL_REQUIRED',
+        minimumMatchCount: 0,
+        explanation: ''
+      },
+      transformationRules: {},
+      multiPriceConfig: { hasMultiplePrices: false, priceColumns: [] },
+      validationRules: { validityDateRules: {} },
+      conditionalRules: []
+    }
+
+    setRules(prev => ({
+      ...prev,
+      tableTypes: [...(prev.tableTypes || []), newTableType]
+    }))
+    setSelectedTableTypeIndex(rules.tableTypes?.length || 0)
+  }
+
+  const deleteTableType = (index) => {
+    if (rules.tableTypes?.length <= 1) {
+      alert('Mindestens ein Tabellentyp muss vorhanden sein.')
+      return
+    }
+
+    setRules(prev => ({
+      ...prev,
+      tableTypes: prev.tableTypes.filter((_, i) => i !== index)
+    }))
+
+    // Adjust selected index if needed
+    if (selectedTableTypeIndex >= index && selectedTableTypeIndex > 0) {
+      setSelectedTableTypeIndex(selectedTableTypeIndex - 1)
+    }
+  }
+
+  const updateTableType = (index, updates) => {
+    setRules(prev => ({
+      ...prev,
+      tableTypes: prev.tableTypes.map((tt, i) =>
+        i === index ? { ...tt, ...updates } : tt
+      )
+    }))
+  }
+
+  const updateSelectedTableType = (updates) => {
+    updateTableType(selectedTableTypeIndex, updates)
   }
 
   const loadPdf = async () => {
@@ -113,16 +241,6 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
     }
   }
 
-  const updateColumnMapping = (field, value) => {
-    setRules({
-      ...rules,
-      columnMappings: {
-        ...rules.columnMappings,
-        [field]: value === '' ? null : parseInt(value)
-      }
-    })
-  }
-
   const updateContractMetadata = (field, value) => {
     setRules({
       ...rules,
@@ -134,32 +252,30 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
   }
 
   const updateValidationRule = (field, value) => {
-    setRules({
-      ...rules,
+    updateSelectedTableType({
       validationRules: {
-        ...rules.validationRules,
+        ...rules.tableTypes[selectedTableTypeIndex].validationRules,
         [field]: value === '' ? null : (field === 'positionNumberPattern' ? value : parseInt(value))
       }
     })
   }
 
   const updateMultiPriceConfig = (field, value) => {
-    setRules({
-      ...rules,
+    updateSelectedTableType({
       multiPriceConfig: {
-        ...rules.multiPriceConfig,
-        [field]: field === 'hasMultiplePrices' ? value : rules.multiPriceConfig[field]
+        ...rules.tableTypes[selectedTableTypeIndex].multiPriceConfig,
+        [field]: field === 'hasMultiplePrices' ? value : rules.tableTypes[selectedTableTypeIndex].multiPriceConfig[field]
       }
     })
   }
 
   const addPriceColumn = () => {
-    setRules({
-      ...rules,
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    updateSelectedTableType({
       multiPriceConfig: {
-        ...rules.multiPriceConfig,
+        ...currentTableType.multiPriceConfig,
         priceColumns: [
-          ...(rules.multiPriceConfig.priceColumns || []),
+          ...(currentTableType.multiPriceConfig.priceColumns || []),
           { columnIndex: null, priceType: '' }
         ]
       }
@@ -167,35 +283,35 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
   }
 
   const removePriceColumn = (index) => {
-    setRules({
-      ...rules,
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    updateSelectedTableType({
       multiPriceConfig: {
-        ...rules.multiPriceConfig,
-        priceColumns: rules.multiPriceConfig.priceColumns.filter((_, i) => i !== index)
+        ...currentTableType.multiPriceConfig,
+        priceColumns: currentTableType.multiPriceConfig.priceColumns.filter((_, i) => i !== index)
       }
     })
   }
 
   const updatePriceColumn = (index, field, value) => {
-    const updatedColumns = [...rules.multiPriceConfig.priceColumns]
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    const updatedColumns = [...currentTableType.multiPriceConfig.priceColumns]
     updatedColumns[index] = {
       ...updatedColumns[index],
       [field]: field === 'columnIndex' ? (value === '' ? null : parseInt(value)) : value
     }
-    setRules({
-      ...rules,
+    updateSelectedTableType({
       multiPriceConfig: {
-        ...rules.multiPriceConfig,
+        ...currentTableType.multiPriceConfig,
         priceColumns: updatedColumns
       }
     })
   }
 
   const addConditionalRule = () => {
-    setRules({
-      ...rules,
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    updateSelectedTableType({
       conditionalRules: [
-        ...(rules.conditionalRules || []),
+        ...(currentTableType.conditionalRules || []),
         {
           name: '',
           enabled: true,
@@ -218,26 +334,27 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
   }
 
   const removeConditionalRule = (index) => {
-    setRules({
-      ...rules,
-      conditionalRules: rules.conditionalRules.filter((_, i) => i !== index)
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    updateSelectedTableType({
+      conditionalRules: currentTableType.conditionalRules.filter((_, i) => i !== index)
     })
   }
 
   const updateConditionalRule = (index, field, value) => {
-    const updatedRules = [...rules.conditionalRules]
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    const updatedRules = [...currentTableType.conditionalRules]
     updatedRules[index] = {
       ...updatedRules[index],
       [field]: value
     }
-    setRules({
-      ...rules,
+    updateSelectedTableType({
       conditionalRules: updatedRules
     })
   }
 
   const updateCondition = (ruleIndex, field, value) => {
-    const updatedRules = [...rules.conditionalRules]
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    const updatedRules = [...currentTableType.conditionalRules]
     updatedRules[ruleIndex] = {
       ...updatedRules[ruleIndex],
       condition: {
@@ -245,14 +362,14 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
         [field]: field === 'columnIndex' ? (value === '' ? null : parseInt(value)) : value
       }
     }
-    setRules({
-      ...rules,
+    updateSelectedTableType({
       conditionalRules: updatedRules
     })
   }
 
   const updateAction = (ruleIndex, actionIndex, field, value) => {
-    const updatedRules = [...rules.conditionalRules]
+    const currentTableType = rules.tableTypes[selectedTableTypeIndex]
+    const updatedRules = [...currentTableType.conditionalRules]
     const updatedActions = [...updatedRules[ruleIndex].actions]
     updatedActions[actionIndex] = {
       ...updatedActions[actionIndex],
@@ -262,7 +379,7 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
       ...updatedRules[ruleIndex],
       actions: updatedActions
     }
-    setRules({
+    updateSelectedTableType({
       ...rules,
       conditionalRules: updatedRules
     })
@@ -295,6 +412,79 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
     })
   }
 
+  // Column management functions
+  const addColumn = () => {
+    const currentColumns = rules?.tableTypes?.[selectedTableTypeIndex]?.columns || []
+    const newColumn = {
+      index: currentColumns.length,
+      name: '',
+      dataType: 'TEXT',
+      description: '',
+      required: false,
+      mappedTo: ''
+    }
+    updateSelectedTableType({
+      columns: [...currentColumns, newColumn]
+    })
+  }
+
+  const updateColumn = (columnIndex, field, value) => {
+    const currentColumns = [...(rules?.tableTypes?.[selectedTableTypeIndex]?.columns || [])]
+    currentColumns[columnIndex] = {
+      ...currentColumns[columnIndex],
+      [field]: value
+    }
+    // Update indices to match array positions
+    currentColumns.forEach((col, idx) => {
+      col.index = idx
+    })
+    updateSelectedTableType({
+      columns: currentColumns
+    })
+  }
+
+  const removeColumn = (columnIndex) => {
+    const currentColumns = rules?.tableTypes?.[selectedTableTypeIndex]?.columns || []
+    const updatedColumns = currentColumns.filter((_, i) => i !== columnIndex)
+    // Update indices to match new array positions
+    updatedColumns.forEach((col, idx) => {
+      col.index = idx
+    })
+    updateSelectedTableType({
+      columns: updatedColumns
+    })
+  }
+
+  const moveColumnUp = (columnIndex) => {
+    if (columnIndex === 0) return
+    const currentColumns = [...(rules?.tableTypes?.[selectedTableTypeIndex]?.columns || [])]
+    const temp = currentColumns[columnIndex]
+    currentColumns[columnIndex] = currentColumns[columnIndex - 1]
+    currentColumns[columnIndex - 1] = temp
+    // Update indices
+    currentColumns.forEach((col, idx) => {
+      col.index = idx
+    })
+    updateSelectedTableType({
+      columns: currentColumns
+    })
+  }
+
+  const moveColumnDown = (columnIndex) => {
+    const currentColumns = [...(rules?.tableTypes?.[selectedTableTypeIndex]?.columns || [])]
+    if (columnIndex >= currentColumns.length - 1) return
+    const temp = currentColumns[columnIndex]
+    currentColumns[columnIndex] = currentColumns[columnIndex + 1]
+    currentColumns[columnIndex + 1] = temp
+    // Update indices
+    currentColumns.forEach((col, idx) => {
+      col.index = idx
+    })
+    updateSelectedTableType({
+      columns: currentColumns
+    })
+  }
+
   if (loading) {
     return (
       <div className="dialog-overlay">
@@ -315,7 +505,34 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
     <div className="dialog-overlay">
       <div className="dialog-content extraction-rules-dialog">
         <div className="dialog-header">
-          <h2>Extraction Rules - {contractFile.fileName}</h2>
+          <div className="header-title-section">
+            <h2>Extraction Rules - {contractFile.fileName}</h2>
+            <div className="table-type-selector">
+              <label>Tabellentyp:</label>
+              <select
+                value={selectedTableTypeIndex}
+                onChange={(e) => setSelectedTableTypeIndex(parseInt(e.target.value))}
+                className="table-type-select"
+              >
+                {rules?.tableTypes?.map((tableType, index) => (
+                  <option key={tableType.tableTypeId} value={index}>
+                    {tableType.tableName}
+                  </option>
+                ))}
+              </select>
+              <button onClick={addTableType} className="add-table-type-button" title="Neuen Tabellentyp hinzufügen">
+                +
+              </button>
+              <button
+                onClick={() => deleteTableType(selectedTableTypeIndex)}
+                className="delete-table-type-button"
+                disabled={rules?.tableTypes?.length <= 1}
+                title="Tabellentyp löschen"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
@@ -328,16 +545,10 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
 
         <div className="dialog-tabs">
           <button
-            className={`tab-button ${activeTab === 'columnMappings' ? 'active' : ''}`}
-            onClick={() => setActiveTab('columnMappings')}
+            className={`tab-button ${activeTab === 'tableTypeConfig' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tableTypeConfig')}
           >
-            Spaltenzuordnung
-          </button>
-          <button
-            className={`tab-button ${activeTab === 'contractMetadata' ? 'active' : ''}`}
-            onClick={() => setActiveTab('contractMetadata')}
-          >
-            Vertragsdaten
+            Typ-Konfiguration
           </button>
           <button
             className={`tab-button ${activeTab === 'multiPrice' ? 'active' : ''}`}
@@ -357,84 +568,237 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
           >
             Bedingte Regeln
           </button>
+          <button
+            className={`tab-button ${activeTab === 'contractMetadata' ? 'active' : ''}`}
+            onClick={() => setActiveTab('contractMetadata')}
+          >
+            Vertragsdaten (Global)
+          </button>
         </div>
 
         <div className="dialog-body">
-          {activeTab === 'columnMappings' && (
+          {activeTab === 'tableTypeConfig' && (
             <div className="tab-content">
-              <h3>Spaltenzuordnung</h3>
-              <p className="tab-description">Definieren Sie, welche Spalte (Index) welche Information enthält.</p>
+              <h3>Typ-Konfiguration: {rules?.tableTypes?.[selectedTableTypeIndex]?.tableName}</h3>
+              <p className="tab-description">
+                Konfigurieren Sie die Header-Erkennung für diesen Tabellentyp. Die Tabelle wird anhand ihrer Header-Zeile automatisch erkannt.
+              </p>
 
-              <div className="form-grid">
+              <div className="form-group">
+                <label>Tabellenname</label>
+                <input
+                  type="text"
+                  value={rules?.tableTypes?.[selectedTableTypeIndex]?.tableName || ''}
+                  onChange={(e) => updateSelectedTableType({ tableName: e.target.value })}
+                  placeholder="z.B. Haupttabelle, Zusatzleistungen, etc."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Spalten-Definitionen</label>
+                <small className="mb-2">Definieren Sie alle Spalten dieser Tabelle mit ihren Eigenschaften</small>
+
+                {rules?.tableTypes?.[selectedTableTypeIndex]?.columns?.map((column, colIndex) => (
+                  <div key={colIndex} className="column-definition-item">
+                    <div className="column-definition-header">
+                      <span className="column-index">#{colIndex}</span>
+                      <div className="column-actions">
+                        <button
+                          type="button"
+                          className="move-button"
+                          onClick={() => moveColumnUp(colIndex)}
+                          disabled={colIndex === 0}
+                          title="Nach oben"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="move-button"
+                          onClick={() => moveColumnDown(colIndex)}
+                          disabled={colIndex === (rules?.tableTypes?.[selectedTableTypeIndex]?.columns?.length || 0) - 1}
+                          title="Nach unten"
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="remove-button small"
+                          onClick={() => removeColumn(colIndex)}
+                          title="Spalte entfernen"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="column-definition-fields">
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Spaltenname *</label>
+                          <input
+                            type="text"
+                            value={column.name || ''}
+                            onChange={(e) => updateColumn(colIndex, 'name', e.target.value)}
+                            placeholder="z.B. Position, Bezeichnung, Preis"
+                            required
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label>Datentyp</label>
+                          <select
+                            value={column.dataType || 'TEXT'}
+                            onChange={(e) => updateColumn(colIndex, 'dataType', e.target.value)}
+                          >
+                            <option value="TEXT">Text</option>
+                            <option value="NUMBER">Zahl</option>
+                            <option value="CURRENCY">Währung</option>
+                            <option value="DATE">Datum</option>
+                            <option value="PERCENTAGE">Prozent</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Zuordnung zu Feld</label>
+                          <select
+                            value={column.mappedTo || ''}
+                            onChange={(e) => updateColumn(colIndex, 'mappedTo', e.target.value)}
+                          >
+                            <option value="">-- Keine Zuordnung --</option>
+                            <option value="positionNumber">Positionsnummer</option>
+                            <option value="description">Beschreibung</option>
+                            <option value="unit">Einheit</option>
+                            <option value="price">Preis</option>
+                            <option value="tax">MwSt</option>
+                            <option value="costEstimate">Kostenvoranschlag</option>
+                          </select>
+                        </div>
+
+                        <div className="form-group">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={column.required || false}
+                              onChange={(e) => updateColumn(colIndex, 'required', e.target.checked)}
+                            />
+                            Erforderlich
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="form-group">
+                        <label>Beschreibung</label>
+                        <input
+                          type="text"
+                          value={column.description || ''}
+                          onChange={(e) => updateColumn(colIndex, 'description', e.target.value)}
+                          placeholder="Was enthält diese Spalte?"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button type="button" className="add-button" onClick={addColumn}>
+                  + Spalte hinzufügen
+                </button>
+              </div>
+
+              <div className="form-group">
+                <label>Typ-ID</label>
+                <input
+                  type="text"
+                  value={rules?.tableTypes?.[selectedTableTypeIndex]?.tableTypeId || ''}
+                  disabled
+                  className="readonly-input"
+                />
+                <small>Die Typ-ID wird automatisch generiert</small>
+              </div>
+
+              <div className="form-group">
+                <label>Matching-Strategie</label>
+                <select
+                  value={rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher?.matchingStrategy || 'ALL_REQUIRED'}
+                  onChange={(e) => updateSelectedTableType({
+                    headerMatcher: {
+                      ...rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher,
+                      matchingStrategy: e.target.value
+                    }
+                  })}
+                >
+                  <option value="ALL_REQUIRED">Alle erforderlichen Header müssen vorhanden sein</option>
+                  <option value="ANY_REQUIRED">Mindestens ein erforderlicher Header muss vorhanden sein</option>
+                  <option value="MINIMUM_COUNT">Mindestanzahl an Headern muss vorhanden sein</option>
+                </select>
+                <small>Legt fest, wie streng die Header-Übereinstimmung sein muss</small>
+              </div>
+
+              {rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher?.matchingStrategy === 'MINIMUM_COUNT' && (
                 <div className="form-group">
-                  <label>Positionsnummer</label>
+                  <label>Mindestanzahl</label>
                   <input
                     type="number"
-                    value={rules.columnMappings?.positionNumberColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('positionNumberColumn', e.target.value)}
-                    placeholder="z.B. 0"
+                    value={rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher?.minimumMatchCount || 0}
+                    onChange={(e) => updateSelectedTableType({
+                      headerMatcher: {
+                        ...rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher,
+                        minimumMatchCount: parseInt(e.target.value)
+                      }
+                    })}
+                    min="0"
                   />
                 </div>
+              )}
 
-                <div className="form-group">
-                  <label>Beschreibung</label>
-                  <input
-                    type="number"
-                    value={rules.columnMappings?.descriptionColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('descriptionColumn', e.target.value)}
-                    placeholder="z.B. 1"
-                  />
-                </div>
+              <div className="form-group">
+                <label>Erforderliche Header (einer pro Zeile)</label>
+                <textarea
+                  value={rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher?.requiredHeaders?.join('\n') || ''}
+                  onChange={(e) => updateSelectedTableType({
+                    headerMatcher: {
+                      ...rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher,
+                      requiredHeaders: e.target.value.split('\n').filter(h => h.trim())
+                    }
+                  })}
+                  rows={5}
+                  placeholder="z.B.&#10;Positionsnummer&#10;Artikelbezeichnung&#10;Preis"
+                />
+                <small>Diese Header müssen in der Tabelle vorhanden sein, um sie als diesen Typ zu erkennen</small>
+              </div>
 
-                <div className="form-group">
-                  <label>Einheit</label>
-                  <input
-                    type="number"
-                    value={rules.columnMappings?.unitColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('unitColumn', e.target.value)}
-                    placeholder="z.B. 2"
-                  />
-                </div>
+              <div className="form-group">
+                <label>Optionale Header (einer pro Zeile)</label>
+                <textarea
+                  value={rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher?.optionalHeaders?.join('\n') || ''}
+                  onChange={(e) => updateSelectedTableType({
+                    headerMatcher: {
+                      ...rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher,
+                      optionalHeaders: e.target.value.split('\n').filter(h => h.trim())
+                    }
+                  })}
+                  rows={3}
+                  placeholder="z.B.&#10;Hinweis&#10;Bemerkung"
+                />
+                <small>Diese Header erhöhen die Übereinstimmung, sind aber nicht zwingend erforderlich</small>
+              </div>
 
-                <div className="form-group">
-                  <label>Preis</label>
-                  <input
-                    type="number"
-                    value={rules.columnMappings?.priceColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('priceColumn', e.target.value)}
-                    placeholder="z.B. 3"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Steuersatz</label>
-                  <input
-                    type="number"
-                    value={rules.columnMappings?.taxColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('taxColumn', e.target.value)}
-                    placeholder="z.B. 4"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Kostenvoranschlag</label>
-                  <input
-                    type="number"
-                    value={rules.columnMappings?.costEstimateColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('costEstimateColumn', e.target.value)}
-                    placeholder="z.B. 5"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label>Versorgungsart</label>
-                  <input
-                    type="number"
-                    value={rules.columnMappings?.supplyTypeColumn ?? ''}
-                    onChange={(e) => updateColumnMapping('supplyTypeColumn', e.target.value)}
-                    placeholder="z.B. 6"
-                  />
-                </div>
+              <div className="form-group">
+                <label>Erklärung / Beschreibung</label>
+                <textarea
+                  value={rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher?.explanation || ''}
+                  onChange={(e) => updateSelectedTableType({
+                    headerMatcher: {
+                      ...rules?.tableTypes?.[selectedTableTypeIndex]?.headerMatcher,
+                      explanation: e.target.value
+                    }
+                  })}
+                  rows={2}
+                  placeholder="Beschreibung, wann dieser Tabellentyp verwendet werden soll..."
+                />
+                <small>Optional: Zusätzliche Informationen zu diesem Tabellentyp</small>
               </div>
             </div>
           )}
@@ -504,23 +868,25 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
           {activeTab === 'multiPrice' && (
             <div className="tab-content">
               <h3>Mehrfachpreise</h3>
-              <p className="tab-description">Konfiguration für Tabellen mit mehreren Preisspalten.</p>
+              <p className="tab-description">
+                Konfiguration für Tabellen mit mehreren Preisspalten für <strong>{rules?.tableTypes?.[selectedTableTypeIndex]?.tableName}</strong>.
+              </p>
 
               <div className="form-group">
                 <label>
                   <input
                     type="checkbox"
-                    checked={rules.multiPriceConfig?.hasMultiplePrices ?? false}
+                    checked={rules?.tableTypes?.[selectedTableTypeIndex]?.multiPriceConfig?.hasMultiplePrices ?? false}
                     onChange={(e) => updateMultiPriceConfig('hasMultiplePrices', e.target.checked)}
                   />
                   Tabelle hat mehrere Preisspalten
                 </label>
               </div>
 
-              {rules.multiPriceConfig?.hasMultiplePrices && (
+              {rules?.tableTypes?.[selectedTableTypeIndex]?.multiPriceConfig?.hasMultiplePrices && (
                 <div className="price-columns-list">
                   <h4>Preisspalten</h4>
-                  {rules.multiPriceConfig.priceColumns?.map((priceCol, index) => (
+                  {rules?.tableTypes?.[selectedTableTypeIndex]?.multiPriceConfig?.priceColumns?.map((priceCol, index) => (
                     <div key={index} className="price-column-item">
                       <div className="form-grid">
                         <div className="form-group">
@@ -566,14 +932,16 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
           {activeTab === 'validation' && (
             <div className="tab-content">
               <h3>Validierungsregeln</h3>
-              <p className="tab-description">Regeln zur Validierung der extrahierten Daten.</p>
+              <p className="tab-description">
+                Regeln zur Validierung der extrahierten Daten für <strong>{rules?.tableTypes?.[selectedTableTypeIndex]?.tableName}</strong>.
+              </p>
 
               <div className="form-grid">
                 <div className="form-group full-width">
                   <label>Positionsnummer-Muster (Regex)</label>
                   <input
                     type="text"
-                    value={rules.validationRules?.positionNumberPattern ?? ''}
+                    value={rules?.tableTypes?.[selectedTableTypeIndex]?.validationRules?.positionNumberPattern ?? ''}
                     onChange={(e) => updateValidationRule('positionNumberPattern', e.target.value)}
                     placeholder="z.B. 31\\.\\d+\\.\\d+"
                   />
@@ -583,7 +951,7 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
                   <label>Kopfzeilen-Index</label>
                   <input
                     type="number"
-                    value={rules.validationRules?.headerRowIndex ?? ''}
+                    value={rules?.tableTypes?.[selectedTableTypeIndex]?.validationRules?.headerRowIndex ?? ''}
                     onChange={(e) => updateValidationRule('headerRowIndex', e.target.value)}
                     placeholder="z.B. 0"
                   />
@@ -593,7 +961,7 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
                   <label>Erste Datenzeile</label>
                   <input
                     type="number"
-                    value={rules.validationRules?.firstDataRowIndex ?? ''}
+                    value={rules?.tableTypes?.[selectedTableTypeIndex]?.validationRules?.firstDataRowIndex ?? ''}
                     onChange={(e) => updateValidationRule('firstDataRowIndex', e.target.value)}
                     placeholder="z.B. 1"
                   />
@@ -606,12 +974,12 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
             <div className="tab-content">
               <h3>Bedingte Regeln (Wenn/Dann)</h3>
               <p className="tab-description">
-                Definieren Sie Regeln, die basierend auf Zellinhalten bestimmte Felder setzen.
+                Definieren Sie Regeln, die basierend auf Zellinhalten bestimmte Felder setzen für <strong>{rules?.tableTypes?.[selectedTableTypeIndex]?.tableName}</strong>.
                 Beispiel: Wenn Spalte 4 "KV" enthält, dann setze Kostenvoranschlag auf "JA".
               </p>
 
               <div className="conditional-rules-list">
-                {rules.conditionalRules?.map((rule, ruleIndex) => (
+                {rules?.tableTypes?.[selectedTableTypeIndex]?.conditionalRules?.map((rule, ruleIndex) => (
                   <div key={ruleIndex} className="conditional-rule-item">
                     <div className="rule-header">
                       <div className="form-group full-width">
@@ -653,13 +1021,36 @@ function ExtractionRulesDialog({ contractFile, onClose, onSave }) {
                         </div>
 
                         <div className="form-group">
-                          <label>Spaltenindex</label>
-                          <input
-                            type="number"
-                            value={rule.condition?.columnIndex ?? ''}
-                            onChange={(e) => updateCondition(ruleIndex, 'columnIndex', e.target.value)}
-                            placeholder="z.B. 4"
-                          />
+                          <label>Spalte</label>
+                          {rules?.tableTypes?.[selectedTableTypeIndex]?.columns?.length > 0 ? (
+                            <select
+                              value={rule.condition?.columnName || ''}
+                              onChange={(e) => {
+                                // Clear columnIndex when columnName is set
+                                updateCondition(ruleIndex, 'columnName', e.target.value)
+                                updateCondition(ruleIndex, 'columnIndex', null)
+                              }}
+                            >
+                              <option value="">-- Spalte wählen --</option>
+                              {rules.tableTypes[selectedTableTypeIndex].columns.map((column, idx) => (
+                                <option key={idx} value={column.name}>
+                                  {column.name} ({column.dataType})
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="number"
+                              value={rule.condition?.columnIndex ?? ''}
+                              onChange={(e) => updateCondition(ruleIndex, 'columnIndex', e.target.value)}
+                              placeholder="z.B. 4"
+                            />
+                          )}
+                          <small className="field-hint">
+                            {rules?.tableTypes?.[selectedTableTypeIndex]?.columns?.length > 0
+                              ? 'Wählen Sie eine Spalte nach Name'
+                              : 'Geben Sie den Spaltenindex ein (0-basiert)'}
+                          </small>
                         </div>
 
                         {(rule.condition?.type === 'COLUMN_CONTAINS' ||

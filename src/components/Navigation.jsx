@@ -10,13 +10,24 @@ function Navigation({ currentView, onNavigate }) {
     { id: 'guilds', label: 'Innungen', icon: '🤝' },
   ];
 
+  // Determine which tab should be active based on current view
+  const getActiveTab = () => {
+    if (currentView === 'insurance-detail') return 'insurances';
+    if (currentView === 'provider-detail') return 'providers';
+    if (currentView === 'guild-detail') return 'guilds';
+    if (currentView === 'contract-prices') return 'contracts';
+    return currentView;
+  };
+
+  const activeTab = getActiveTab();
+
   return (
     <nav className="navigation">
       <div className="nav-items">
         {menuItems.map((item) => (
           <button
             key={item.id}
-            className={`nav-item ${currentView === item.id ? 'active' : ''}`}
+            className={`nav-item ${activeTab === item.id ? 'active' : ''}`}
             onClick={() => onNavigate(item.id)}
           >
             <span className="nav-icon">{item.icon}</span>

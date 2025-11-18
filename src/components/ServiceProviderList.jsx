@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { getServiceProviders, deleteServiceProvider, getGuilds } from '../services/api';
+import { getServiceProviders, getGuilds } from '../services/api';
 import './ServiceProviderList.css';
 
-function ServiceProviderList({ onAdd, onEdit }) {
+function ServiceProviderList({ onAdd, onViewDetail }) {
   const [providers, setProviders] = useState([]);
   const [guilds, setGuilds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     loadProviders();
@@ -52,22 +51,6 @@ function ServiceProviderList({ onAdd, onEdit }) {
         ))}
       </>
     );
-  };
-
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Möchten Sie den Leistungserbringer "${name}" wirklich löschen?`)) {
-      return;
-    }
-
-    setDeletingId(id);
-    try {
-      await deleteServiceProvider(id);
-      setProviders(providers.filter(prov => prov.id !== id));
-    } catch (err) {
-      alert(`Fehler beim Löschen: ${err.message}`);
-    } finally {
-      setDeletingId(null);
-    }
   };
 
   const formatAddress = (address) => {
@@ -117,11 +100,19 @@ function ServiceProviderList({ onAdd, onEdit }) {
       ) : (
         <div className="provider-grid">
           {providers.map((provider) => (
-            <div key={provider.id} className="provider-card">
+            <div
+              key={provider.id}
+              className="provider-card clickable"
+              onClick={() => onViewDetail(provider)}
+            >
               <div className="provider-card-header">
                 <h3>{provider.name}</h3>
               </div>
               <div className="provider-card-body">
+                <div className="provider-info">
+                  <label>IK-Nummer:</label>
+                  <p>{provider.ikNumber || 'Nicht angegeben'}</p>
+                </div>
                 <div className="provider-info">
                   <label>Adresse:</label>
                   <p>{formatAddress(provider.address)}</p>
@@ -132,20 +123,7 @@ function ServiceProviderList({ onAdd, onEdit }) {
                 </div>
               </div>
               <div className="provider-card-footer">
-                <button
-                  className="btn-secondary"
-                  onClick={() => onEdit(provider)}
-                  disabled={deletingId === provider.id}
-                >
-                  Bearbeiten
-                </button>
-                <button
-                  className="btn-danger"
-                  onClick={() => handleDelete(provider.id, provider.name)}
-                  disabled={deletingId === provider.id}
-                >
-                  {deletingId === provider.id ? 'Löschen...' : 'Löschen'}
-                </button>
+                <span className="view-details">Details ansehen →</span>
               </div>
             </div>
           ))}

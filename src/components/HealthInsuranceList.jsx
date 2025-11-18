@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { getHealthInsurances, deleteHealthInsurance } from '../services/api';
+import { getHealthInsurances } from '../services/api';
 import './HealthInsuranceList.css';
 
-function HealthInsuranceList({ onAdd, onEdit }) {
+function HealthInsuranceList({ onAdd, onViewDetail }) {
   const [insurances, setInsurances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [deletingId, setDeletingId] = useState(null);
 
   useEffect(() => {
     loadInsurances();
@@ -22,22 +21,6 @@ function HealthInsuranceList({ onAdd, onEdit }) {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleDelete = async (id, name) => {
-    if (!confirm(`Möchten Sie die Krankenkasse "${name}" wirklich löschen?`)) {
-      return;
-    }
-
-    setDeletingId(id);
-    try {
-      await deleteHealthInsurance(id);
-      setInsurances(insurances.filter(ins => ins.id !== id));
-    } catch (err) {
-      alert(`Fehler beim Löschen: ${err.message}`);
-    } finally {
-      setDeletingId(null);
     }
   };
 
@@ -88,31 +71,26 @@ function HealthInsuranceList({ onAdd, onEdit }) {
       ) : (
         <div className="insurance-grid">
           {insurances.map((insurance) => (
-            <div key={insurance.id} className="insurance-card">
+            <div
+              key={insurance.id}
+              className="insurance-card clickable"
+              onClick={() => onViewDetail(insurance)}
+            >
               <div className="insurance-card-header">
                 <h3>{insurance.name}</h3>
               </div>
               <div className="insurance-card-body">
+                <div className="insurance-info">
+                  <label>IK-Nummer:</label>
+                  <p>{insurance.ikNumber || 'Nicht angegeben'}</p>
+                </div>
                 <div className="insurance-info">
                   <label>Adresse:</label>
                   <p>{formatAddress(insurance.address)}</p>
                 </div>
               </div>
               <div className="insurance-card-footer">
-                <button
-                  className="btn-secondary"
-                  onClick={() => onEdit(insurance)}
-                  disabled={deletingId === insurance.id}
-                >
-                  Bearbeiten
-                </button>
-                <button
-                  className="btn-danger"
-                  onClick={() => handleDelete(insurance.id, insurance.name)}
-                  disabled={deletingId === insurance.id}
-                >
-                  {deletingId === insurance.id ? 'Löschen...' : 'Löschen'}
-                </button>
+                <span className="view-details">Details ansehen →</span>
               </div>
             </div>
           ))}

@@ -447,35 +447,63 @@ function ContractPriceDetailView({ contractFileId, contractFileName, onBack }) {
         {/* PDF Viewer Section */}
         <div className={`pdf-section ${pdfCollapsed ? 'collapsed' : ''}`}>
           <div className="section-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <h3>PDF Vorschau</h3>
+            <h3>PDF Vorschau</h3>
+
+            <div className="pdf-header-controls">
+              {!pdfCollapsed && (
+                <div className="pdf-controls">
+                  <div className="zoom-controls">
+                    <button
+                      onClick={zoomOut}
+                      className="zoom-button"
+                      title="Verkleinern"
+                      aria-label="Verkleinern"
+                    >
+                      −
+                    </button>
+                    <span className="zoom-level">{Math.round(scale * 100)}%</span>
+                    <button
+                      onClick={zoomIn}
+                      className="zoom-button"
+                      title="Vergrößern"
+                      aria-label="Vergrößern"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="page-controls">
+                    <button
+                      onClick={goToPrevPage}
+                      disabled={pageNumber <= 1}
+                      className="page-nav-button"
+                      aria-label="Vorherige Seite"
+                    >
+                      ←
+                    </button>
+                    <span className="page-info">
+                      Seite {pageNumber} von {numPages || '?'}
+                    </span>
+                    <button
+                      onClick={goToNextPage}
+                      disabled={pageNumber >= numPages}
+                      className="page-nav-button"
+                      aria-label="Nächste Seite"
+                    >
+                      →
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <button
                 onClick={() => setPdfCollapsed(!pdfCollapsed)}
                 className="pdf-toggle-button"
                 title={pdfCollapsed ? 'PDF einblenden' : 'PDF ausblenden'}
+                aria-label={pdfCollapsed ? 'PDF einblenden' : 'PDF ausblenden'}
               >
                 {pdfCollapsed ? '◀' : '▶'}
               </button>
-            </div>
-            <div className="pdf-controls">
-              <button onClick={zoomOut} className="zoom-button" title="Verkleinern">
-                🔍-
-              </button>
-              <span className="zoom-level">{Math.round(scale * 100)}%</span>
-              <button onClick={zoomIn} className="zoom-button" title="Vergrößern">
-                🔍+
-              </button>
-              <div className="page-controls">
-                <button onClick={goToPrevPage} disabled={pageNumber <= 1}>
-                  ←
-                </button>
-                <span className="page-info">
-                  Seite {pageNumber} von {numPages || '?'}
-                </span>
-                <button onClick={goToNextPage} disabled={pageNumber >= numPages}>
-                  →
-                </button>
-              </div>
             </div>
           </div>
 
